@@ -1,13 +1,13 @@
 /**
  *!
- * \file        b_utils.h
+ * \file        b_drv_ds18b20.h
  * \version     v0.0.1
- * \date        2019/12/26
- * \author      Bean(notrynohigh@outlook.com)
+ * \date        2021/04/29
+ * \author      poly(notrynohigh@outlook.com)
  *******************************************************************************
  * @attention
  *
- * Copyright (c) 2019 Bean
+ * Copyright (c) 2020 poly
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,69 +28,45 @@
  * SOFTWARE.
  *******************************************************************************
  */
-#ifndef __B_UTILS_H__
-#define __B_UTILS_H__
+#ifndef __B_DRV_DS18B20H__
+#define __B_DRV_DS18B20H__
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /*Includes ----------------------------------------------*/
-#include "b_util_at.h"
-#include "b_util_delay.h"
-#include "b_util_i2c.h"
-#include "b_util_spi.h"
-#include "b_util_sBus.h"
+#include "b_drv_class_gsensor.h"
 /**
- * \addtogroup B_UTILS
+ * \addtogroup B_DRIVER
  * \{
  */
 
 /**
- * \addtogroup UTILS
+ * \addtogroup DS18B20
  * \{
  */
 
 /**
- * \defgroup UTILS_Exported_TypesDefinitions
+ * \defgroup DS18B20_Exported_TypesDefinitions
  * \{
  */
+
+typedef bDriverInterface_t bDS18B20_Driver_t;
+//static bUtilSbus_t SBUS_IO = {
+//    .sBusIo = {B_HAL_GPIOA, B_HAL_PIN8},
+//};
 
 /**
  * \}
  */
 
 /**
- * \defgroup UTILS_Exported_Defines
+ * \defgroup DS18B20_Exported_Defines
  * \{
  */
+/** Device Identification (Who am I) **/
 
-/**
- * \}
- */
-
-/**
- * \defgroup UTILS_Exported_Macros
- * \{
- */
-
-/**
- * \}
- */
-
-/**
- * \defgroup UTILS_Exported_Variables
- * \{
- */
-
-/**
- * \}
- */
-
-/**
- * \defgroup UTILS_Exported_Functions
- * \{
- */
 
 /**
  * \}
@@ -110,4 +86,4 @@ extern "C" {
 
 #endif
 
-/************************ Copyright (c) 2019 Bean *****END OF FILE****/
+/************************ Copyright (c) 2020 Bean *****END OF FILE****/

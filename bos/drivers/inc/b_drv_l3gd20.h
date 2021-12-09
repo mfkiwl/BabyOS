@@ -36,7 +36,7 @@ extern "C" {
 #endif
 
 /*Includes ----------------------------------------------*/
-#include "b_drv_class_gsensor.h"
+#include "drivers/inc/b_driver.h"
 /**
  * \addtogroup B_DRIVER
  * \{
@@ -51,6 +51,15 @@ extern "C" {
  * \defgroup L3GD20_Exported_TypesDefinitions
  * \{
  */
+typedef struct
+{
+    union
+    {
+        bHalI2CIf_t _i2c;
+        bHalSPIIf_t _spi;
+    } _if;
+    uint8_t is_spi;
+} bL3GD20_HalIf_t;
 
 typedef bDriverInterface_t bL3GD20_Driver_t;
 
@@ -58,7 +67,7 @@ typedef struct
 {
     uint8_t not_used_01 : 7;
     uint8_t sdo_pu_disc : 1;
-} bL3gd20CTRL_REG0_t;
+} bL3gd20CtrlReg0_t;
 
 typedef struct
 {
@@ -67,7 +76,7 @@ typedef struct
     uint8_t zen : 1;
     uint8_t lpen : 1;
     uint8_t odr : 4;
-} bL3gd20CTRL_REG1_t;
+} bL3gd20CtrlReg1_t;
 
 typedef struct
 {
@@ -75,7 +84,7 @@ typedef struct
     uint8_t fds : 1;
     uint8_t hpcf : 2;
     uint8_t hpm : 2;
-} bL3gd20CTRL_REG2_t;
+} bL3gd20CtrlReg2_t;
 
 typedef struct
 {
@@ -87,7 +96,7 @@ typedef struct
     uint8_t i1_ia2 : 1;
     uint8_t i1_ia1 : 1;
     uint8_t i1_click : 1;
-} bL3gd20CTRL_REG3_t;
+} bL3gd20CtrlReg3_t;
 
 typedef enum
 {
@@ -108,7 +117,7 @@ typedef struct
     uint8_t fs : 2;
     uint8_t ble : 1;
     uint8_t bdu : 1;
-} bL3gd20CTRL_REG4_t;
+} bL3gd20CtrlReg4_t;
 
 typedef struct
 {
@@ -119,7 +128,7 @@ typedef struct
     uint8_t not_used_01 : 2;
     uint8_t fifo_en : 1;
     uint8_t boot : 1;
-} bL3gd20CTRL_REG5_t;
+} bL3gd20CtrlReg5_t;
 
 typedef struct
 {
@@ -131,14 +140,14 @@ typedef struct
     uint8_t i2_ia2 : 1;
     uint8_t i2_ia1 : 1;
     uint8_t i2_click : 1;
-} bL3gd20CTRL_REG6_t;
+} bL3gd20CtrlReg6_t;
 
 typedef struct
 {
     uint8_t fth : 5;
     uint8_t tr : 1;
     uint8_t fm : 2;
-} bL3gd20FIFO_CtrlReg_t;
+} bL3gd20FifoCtrlReg_t;
 
 typedef struct
 {
@@ -146,7 +155,7 @@ typedef struct
     uint8_t empty : 1;
     uint8_t ovrn_fifo : 1;
     uint8_t wtm : 1;
-} bL3gd20FIFO_SrcReg_t;
+} bL3gd20FifoSrcReg_t;
 
 typedef enum
 {
@@ -154,7 +163,7 @@ typedef enum
     L3GD20_FIFO_MODE           = 1,
     L3GD20_DYNAMIC_STREAM_MODE = 2,
     L3GD20_STREAM_TO_FIFO_MODE = 3,
-} bL3gd20FIFO_Mode_t;
+} bL3gd20FifoMode_t;
 
 typedef enum
 {
@@ -196,7 +205,7 @@ typedef struct
     bL3gd20ODR_t       odr;          // Output data rates \ref bL3gd20ODR_t
     bL3gd20FS_t        fs;           // Full scale \ref bL3gd20FS_t
     bL3gd20OpMode_t    op_mode;      // Operating mode \ref bL3gd20OpMode_t
-    bL3gd20FIFO_Mode_t fifo_mode;    // FIFO Mode \ref bL3gd20FIFO_Mode_t
+    bL3gd20FifoMode_t fifo_mode;    // FIFO Mode \ref bL3gd20FifoMode_t
 } bL3gd20Config_t;
 
 /**

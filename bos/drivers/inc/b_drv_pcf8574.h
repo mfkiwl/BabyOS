@@ -36,7 +36,7 @@ extern "C" {
 #endif
 
 /*Includes ----------------------------------------------*/
-#include "b_drv_class_io.h"
+#include "drivers/inc/b_driver.h"
 /**
  * \addtogroup B_DRIVER
  * \{
@@ -51,6 +51,7 @@ extern "C" {
  * \defgroup PCF8574_Exported_TypesDefinitions
  * \{
  */
+typedef bHalI2CIf_t bPCF8574_HalIf_t;
 
 typedef bDriverInterface_t bPCF8574_Driver_t;
 /**

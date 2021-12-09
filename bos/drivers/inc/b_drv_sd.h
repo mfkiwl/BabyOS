@@ -36,7 +36,7 @@ extern "C" {
 #endif
 
 /*Includes ----------------------------------------------*/
-#include "b_drv_class_flash.h"
+#include "drivers/inc/b_driver.h"
 /**
  * \addtogroup B_DRIVER
  * \{
@@ -51,6 +51,8 @@ extern "C" {
  * \defgroup SD_Exported_TypesDefinitions
  * \{
  */
+typedef bHalSPIIf_t bSD_HalIf_t;
+
 typedef bDriverInterface_t bSD_Driver_t;
 /**
  * \}

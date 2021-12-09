@@ -30,7 +30,7 @@
  */
 
 /*Includes ----------------------------------------------*/
-#include "b_mod_trace.h"
+#include "modules/inc/b_mod_trace.h"
 #if _CMBACKTRACE_ENABLE
 
 /**
@@ -49,15 +49,6 @@
  */
 
 /**
- * \defgroup TRACE_Private_TypesDefinitions
- * \{
- */
-
-/**
- * \}
- */
-
-/**
  * \defgroup TRACE_Private_Defines
  * \{
  */
@@ -65,42 +56,6 @@
 #define VERSION_S(n) _VERSION_S(n)
 
 const char *pVersion[2] = {VERSION_S(HW_VERSION), VERSION_S(FW_VERSION)};
-/**
- * \}
- */
-
-/**
- * \defgroup TRACE_Private_Macros
- * \{
- */
-
-/**
- * \}
- */
-
-/**
- * \defgroup TRACE_Private_Variables
- * \{
- */
-
-/**
- * \}
- */
-
-/**
- * \defgroup TRACE_Private_FunctionPrototypes
- * \{
- */
-
-/**
- * \}
- */
-
-/**
- * \defgroup TRACE_Private_Functions
- * \{
- */
-
 /**
  * \}
  */
@@ -121,15 +76,6 @@ int bTraceInit(const char *pfw_name)
 {
     cm_backtrace_init(pfw_name, pVersion[0], pVersion[1]);
     return 0;
-}
-
-/**
- * \brief Called in the HardFault_Handler
- */
-void bHardfaultCallback()
-{
-    uint32_t call_stack[16] = {0};
-    cm_backtrace_call_stack(call_stack, sizeof(call_stack), cmb_get_sp());
 }
 
 /**

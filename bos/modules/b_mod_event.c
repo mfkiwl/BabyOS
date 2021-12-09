@@ -30,7 +30,10 @@
  */
 
 /*Includes ----------------------------------------------*/
-#include "b_mod_event.h"
+#include "modules/inc/b_mod_event.h"
+
+#include "core/inc/b_section.h"
+
 #if _EVENT_MANAGE_ENABLE
 /**
  * \addtogroup BABYOS
@@ -60,7 +63,9 @@
  * \defgroup EVENT_Private_Defines
  * \{
  */
-
+#ifndef NULL
+#define NULL ((void *)0)
+#endif
 /**
  * \}
  */

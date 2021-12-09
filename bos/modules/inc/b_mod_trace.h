@@ -38,7 +38,7 @@ extern "C" {
 /*Includes ----------------------------------------------*/
 #include "b_config.h"
 #if _CMBACKTRACE_ENABLE
-#include "cm_backtrace.h"
+#include "thirdparty/cm_backtrace/cm_backtrace.h"
 /**
  * \addtogroup BABYOS
  * \{
@@ -58,8 +58,9 @@ extern "C" {
  * \defgroup TRACE_Exported_Functions
  * \{
  */
-int  bTraceInit(const char *pfw_name);
-void bHardfaultCallback(void);
+ 
+int bTraceInit(const char *pfw_name);
+
 /**
  * \}
  */

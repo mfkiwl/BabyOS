@@ -30,7 +30,7 @@
  */
 
 /*Includes ----------------------------------------------*/
-#include "b_mod_fifo.h"
+#include "modules/inc/b_mod_fifo.h"
 #if _FIFO_ENABLE
 /**
  * \addtogroup BABYOS
@@ -61,6 +61,11 @@
  * \{
  */
 #define FIFO_LEN(w, r, s) (((w) >= (r)) ? ((w) - (r)) : ((w) + (s) - (r)))
+
+#ifndef NULL
+#define NULL ((void *)0)
+#endif
+
 /**
  * \}
  */

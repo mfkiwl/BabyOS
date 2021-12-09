@@ -36,7 +36,10 @@ extern "C" {
 #endif
 
 /*Includes ----------------------------------------------*/
+#include <stdint.h>
+
 #include "b_config.h"
+
 #if (_SAVE_DATA_ENABLE && _SAVE_DATA_A_ENABLE)
 /**
  * \addtogroup BABYOS
@@ -93,7 +96,7 @@ typedef bSDA_Info_t bSDA_Instance_t;
     bSDA_Instance_t name = {.st.time_interval = _time_interval,                                  \
                             .st.total_time    = _total_time,                                     \
                             .st.data_size     = _data_size,                                      \
-                            .st.fbase_addr    = _fbase_addr,                                     \
+                            .st.fbase_address = _fbase_addr,                                     \
                             .st.fsector_size  = _fsector_size,                                   \
                             .dev_no           = _dev_no};
 

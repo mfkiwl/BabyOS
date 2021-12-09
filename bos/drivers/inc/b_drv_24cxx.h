@@ -36,7 +36,7 @@ extern "C" {
 #endif
 
 /*Includes ----------------------------------------------*/
-#include "b_drv_class_flash.h"
+#include "drivers/inc/b_driver.h"
 /**
  * \addtogroup B_DRIVER
  * \{
@@ -52,11 +52,7 @@ extern "C" {
  * \{
  */
 
-typedef struct
-{
-    bHalI2CNumber_t iic;
-    uint8_t         addr;
-} b24CXX_HalIf_t;
+typedef bHalI2CIf_t b24CXX_HalIf_t;
 
 typedef bDriverInterface_t b24CXX_Driver_t;
 /**

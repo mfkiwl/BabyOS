@@ -36,15 +36,18 @@ extern "C" {
 #endif
 
 /*Includes ----------------------------------------------*/
+#include <stdint.h>
+
 #include "b_config.h"
+
 #if _FS_ENABLE
 
 #if (_FS_SELECT == 0)
-#include "ff.h"
+#include "thirdparty/FatFS/ff.h"
 #endif
 
 #if (_FS_SELECT == 1)
-#include "lfs.h"
+#include "thirdparty/littlefs/lfs.h"
 #endif
 
 /**

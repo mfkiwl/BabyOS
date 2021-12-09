@@ -36,9 +36,12 @@ extern "C" {
 #endif
 
 /*Includes ----------------------------------------------*/
+#include <stdint.h>
+
 #include "b_config.h"
+
 #if _UGUI_ENABLE
-#include "UGUI.h"
+#include "thirdparty/UGUI/ugui.h"
 /**
  * \addtogroup BABYOS
  * \{

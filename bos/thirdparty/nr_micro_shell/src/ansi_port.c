@@ -31,22 +31,21 @@
  */
 
 /* Includes ------------------------------------------------------------------*/
-#include "ansi_port.h"
+#include "../inc/ansi_port.h"
 
 #include <stdio.h>
 #include <string.h>
 
-#include "ansi.h"
-#include "nr_micro_shell.h"
-
+#include "../inc/ansi.h"
+#include "../inc/nr_micro_shell.h"
 
 #if _NR_MICRO_SHELL_ENABLE
-#include "b_hal.h"
+#include "hal/inc/b_hal.h"
 
 void ansi_show_char(char ch)
 {
 #if NR_SHELL_ECHO_ENABLE
-    bHalUartSend(HAL_LOG_UART, (uint8_t *)&ch, 1);
+    bHalUartDriver.pSend(HAL_LOG_UART, (uint8_t *)&ch, 1);
 #endif
 }
 

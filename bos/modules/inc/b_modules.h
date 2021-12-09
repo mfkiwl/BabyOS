@@ -36,7 +36,7 @@ extern "C" {
 #endif
 
 /*Includes ----------------------------------------------*/
-#include "b_mod_battery.h"
+#include "b_mod_adchub.h"
 #include "b_mod_button.h"
 #include "b_mod_error.h"
 #include "b_mod_event.h"
@@ -50,7 +50,6 @@ extern "C" {
 #include "b_mod_modbus.h"
 #include "b_mod_param.h"
 #include "b_mod_protocol.h"
-#include "b_mod_qpn.h"
 #include "b_mod_sda.h"
 #include "b_mod_sdb.h"
 #include "b_mod_shell.h"

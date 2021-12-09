@@ -30,7 +30,7 @@
  */
 
 /*Includes ----------------------------------------------*/
-#include "b_mod_lunar.h"
+#include "modules/inc/b_mod_lunar.h"
 #if _LUNAR_ENABLE
 /**
  * \addtogroup BABYOS
@@ -60,7 +60,9 @@
  * \defgroup LUNAR_Private_Defines
  * \{
  */
-
+#ifndef NULL
+#define NULL ((void *)0)
+#endif
 /**
  * \}
  */

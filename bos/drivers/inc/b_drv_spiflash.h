@@ -36,7 +36,7 @@ extern "C" {
 #endif
 
 /*Includes ----------------------------------------------*/
-#include "b_drv_class_flash.h"
+#include "drivers/inc/b_driver.h"
 
 /**
  * \addtogroup BABYOS
@@ -59,30 +59,16 @@ extern "C" {
  */
 typedef struct
 {
-    bHalQSPINumber_t   qspi;
-    bHalSPINumber_t    spi;
-    bHalGPIOInstance_t cs;
+    union
+    {
+        //...  qspi reserved
+
+        bHalSPIIf_t _spi;
+    } _if;
+    uint8_t is_spi;
 } bSPIFLASH_HalIf_t;
 
 typedef bDriverInterface_t bSPIFLASH_Driver_t;
-
-/**
- * \}
- */
-
-/**
- * \defgroup SPIFLASH_Exported_Defines
- * \{
- */
-
-/**
- * \}
- */
-
-/**
- * \defgroup SPIFLASH_Exported_Macros
- * \{
- */
 
 /**
  * \}

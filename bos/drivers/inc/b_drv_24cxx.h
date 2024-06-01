@@ -51,10 +51,15 @@ extern "C" {
  * \defgroup 24CXX_Exported_TypesDefinitions
  * \{
  */
-
+//<HALIF 1 I2C
 typedef bHalI2CIf_t b24CXX_HalIf_t;
 
-typedef bDriverInterface_t b24CXX_Driver_t;
+typedef struct
+{
+    uint32_t capacity;   // total size, x byte; default 256bytes
+    uint32_t page_size;  // page size, x byte; default 8bytes
+} b24CXXPrivate_t;
+
 /**
  * \}
  */

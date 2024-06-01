@@ -33,8 +33,11 @@
 
 /*Includes ----------------------------------------------*/
 #include "modules/inc/b_mod_modbus.h"
-#if _MODBUS_ENABLE
+#if (defined(_MODBUS_ENABLE) && (_MODBUS_ENABLE == 1))
 #include <string.h>
+
+#include "algorithm/inc/algo_crc.h"
+
 /**
  * \addtogroup BABYOS
  * \{
@@ -54,7 +57,118 @@
  * \defgroup MODBUS_Private_TypesDefinitions
  * \{
  */
+#pragma pack(1)
 
+typedef struct
+{
+    uint8_t  addr;
+    uint8_t  func;
+    uint16_t reg;  // Big endian
+    uint16_t num;  // Big endian
+    uint16_t crc;  // Little endian
+} bModbusMasterSendReadRegs_t;
+
+typedef struct
+{
+    uint8_t  addr;
+    uint8_t  func;
+    uint8_t  len;
+    uint16_t param[1];
+} bModbusMasterSendReadRegsAck_t;
+
+typedef struct
+{
+    uint8_t  addr;
+    uint8_t  func;
+    uint16_t reg;  // Big endian
+    uint16_t num;  // Big endian
+    uint8_t  len;
+    uint16_t param[1];
+} bModbusMasterSendWriteRegs_t;
+
+typedef struct
+{
+    uint8_t  addr;
+    uint8_t  func;
+    uint16_t reg;    // Big endian
+    uint16_t value;  // Big endian
+    uint16_t crc;    // Little endian
+} bModbusMasterSendWriteReg_t;
+
+typedef struct
+{
+    uint8_t  addr;
+    uint8_t  func;
+    uint16_t reg;  // Big endian
+    uint16_t num;  // Big endian
+    uint16_t crc;  // Little endian
+} bModbusMasterSendWriteRegsAck_t;
+
+typedef struct
+{
+    uint8_t  addr;
+    uint8_t  func;
+    uint16_t reg;    // Big endian
+    uint16_t value;  // Big endian
+    uint16_t crc;    // Little endian
+} bModbusMasterSendWriteRegAck_t;
+
+//----------------------------------------------------------------
+typedef struct
+{
+    uint8_t  addr;
+    uint8_t  func;
+    uint16_t reg;  // Big endian
+    uint16_t num;  // Big endian
+    uint16_t crc;  // Little endian
+} bModbusSlaveRecvReadRegs_t;
+
+typedef struct
+{
+    uint8_t addr;
+    uint8_t func;
+    uint8_t len;
+    uint8_t buf[1];
+} bModbusSlaveRecvReadRegsAck_t;
+
+typedef struct
+{
+    uint8_t  addr;
+    uint8_t  func;
+    uint16_t reg;  // Big endian
+    uint16_t num;  // Big endian
+    uint8_t  len;
+    uint16_t param[1];
+} bModbusSlaveRecvWriteRegs_t;
+
+typedef struct
+{
+    uint8_t  addr;
+    uint8_t  func;
+    uint16_t reg;    // Big endian
+    uint16_t value;  // Big endian
+    uint16_t crc;    // Little endian
+} bModbusSlaveRecvWriteReg_t;
+
+typedef struct
+{
+    uint8_t  addr;
+    uint8_t  func;
+    uint16_t reg;  // Big endian
+    uint16_t num;  // Big endian
+    uint16_t crc;  // Little endian
+} bModbusSlaveRecvWriteRegsAck_t;
+
+typedef struct
+{
+    uint8_t  addr;
+    uint8_t  func;
+    uint16_t reg;    // Big endian
+    uint16_t value;  // Big endian
+    uint16_t crc;    // Little endian
+} bModbusSlaveRecvWriteRegAck_t;
+
+#pragma pack()
 /**
  * \}
  */
@@ -63,7 +177,9 @@
  * \defgroup MODBUS_Private_Defines
  * \{
  */
-
+#define MODBUS_READ_REG_MAX 125
+#define MODBUS_WRITE_REG_MAX 123
+#define ALL_SLAVE_ADDR 0XFF
 /**
  * \}
  */
@@ -81,43 +197,7 @@
  * \defgroup MODBUS_Private_Variables
  * \{
  */
-static uint8_t bMB_SendBuff[MODBUS_BUF_SIZE];
 
-static const uint8_t aucCRCHi[] = {
-    0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40,
-    0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41,
-    0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41,
-    0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40,
-    0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41,
-    0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40,
-    0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40,
-    0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41,
-    0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41,
-    0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40,
-    0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40,
-    0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41,
-    0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40,
-    0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41,
-    0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41,
-    0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40};
-
-static const uint8_t aucCRCLo[] = {
-    0x00, 0xC0, 0xC1, 0x01, 0xC3, 0x03, 0x02, 0xC2, 0xC6, 0x06, 0x07, 0xC7, 0x05, 0xC5, 0xC4, 0x04,
-    0xCC, 0x0C, 0x0D, 0xCD, 0x0F, 0xCF, 0xCE, 0x0E, 0x0A, 0xCA, 0xCB, 0x0B, 0xC9, 0x09, 0x08, 0xC8,
-    0xD8, 0x18, 0x19, 0xD9, 0x1B, 0xDB, 0xDA, 0x1A, 0x1E, 0xDE, 0xDF, 0x1F, 0xDD, 0x1D, 0x1C, 0xDC,
-    0x14, 0xD4, 0xD5, 0x15, 0xD7, 0x17, 0x16, 0xD6, 0xD2, 0x12, 0x13, 0xD3, 0x11, 0xD1, 0xD0, 0x10,
-    0xF0, 0x30, 0x31, 0xF1, 0x33, 0xF3, 0xF2, 0x32, 0x36, 0xF6, 0xF7, 0x37, 0xF5, 0x35, 0x34, 0xF4,
-    0x3C, 0xFC, 0xFD, 0x3D, 0xFF, 0x3F, 0x3E, 0xFE, 0xFA, 0x3A, 0x3B, 0xFB, 0x39, 0xF9, 0xF8, 0x38,
-    0x28, 0xE8, 0xE9, 0x29, 0xEB, 0x2B, 0x2A, 0xEA, 0xEE, 0x2E, 0x2F, 0xEF, 0x2D, 0xED, 0xEC, 0x2C,
-    0xE4, 0x24, 0x25, 0xE5, 0x27, 0xE7, 0xE6, 0x26, 0x22, 0xE2, 0xE3, 0x23, 0xE1, 0x21, 0x20, 0xE0,
-    0xA0, 0x60, 0x61, 0xA1, 0x63, 0xA3, 0xA2, 0x62, 0x66, 0xA6, 0xA7, 0x67, 0xA5, 0x65, 0x64, 0xA4,
-    0x6C, 0xAC, 0xAD, 0x6D, 0xAF, 0x6F, 0x6E, 0xAE, 0xAA, 0x6A, 0x6B, 0xAB, 0x69, 0xA9, 0xA8, 0x68,
-    0x78, 0xB8, 0xB9, 0x79, 0xBB, 0x7B, 0x7A, 0xBA, 0xBE, 0x7E, 0x7F, 0xBF, 0x7D, 0xBD, 0xBC, 0x7C,
-    0xB4, 0x74, 0x75, 0xB5, 0x77, 0xB7, 0xB6, 0x76, 0x72, 0xB2, 0xB3, 0x73, 0xB1, 0x71, 0x70, 0xB0,
-    0x50, 0x90, 0x91, 0x51, 0x93, 0x53, 0x52, 0x92, 0x96, 0x56, 0x57, 0x97, 0x55, 0x95, 0x94, 0x54,
-    0x9C, 0x5C, 0x5D, 0x9D, 0x5F, 0x9F, 0x9E, 0x5E, 0x5A, 0x9A, 0x9B, 0x5B, 0x99, 0x59, 0x58, 0x98,
-    0x88, 0x48, 0x49, 0x89, 0x4B, 0x8B, 0x8A, 0x4A, 0x4E, 0x8E, 0x8F, 0x4F, 0x8D, 0x4D, 0x4C, 0x8C,
-    0x44, 0x84, 0x85, 0x45, 0x87, 0x47, 0x46, 0x86, 0x82, 0x42, 0x43, 0x83, 0x41, 0x81, 0x80, 0x40};
 /**
  * \}
  */
@@ -138,62 +218,485 @@ static const uint8_t aucCRCLo[] = {
 
 static uint16_t _bMBCRC16(uint8_t *pucFrame, uint16_t usLen)
 {
-    uint8_t ucCRCHi = 0xFF;
-    uint8_t ucCRCLo = 0xFF;
-    int     iIndex;
-
-    while (usLen--)
-    {
-        iIndex  = ucCRCLo ^ *(pucFrame++);
-        ucCRCLo = (uint8_t)(ucCRCHi ^ aucCRCHi[iIndex]);
-        ucCRCHi = aucCRCLo[iIndex];
-    }
-    return (uint16_t)(ucCRCHi << 8 | ucCRCLo);
+    uint32_t crc_ret = crc_calculate(ALGO_CRC16_MODBUS, pucFrame, usLen);
+    return ((uint16_t)(crc_ret & 0xffff));
 }
 
-static int _bMB_CheckRTUReadACK(uint8_t *psrc, uint16_t len)
+/**
+ * @description:
+ * 主机收到的MODBUS帧解析是否正确?即从机的发送,此为原始的大端输入,解析正确后转换为小端,调用回调来更新寄存器表
+ * @param {void} *attr
+ * @param {uint8_t} *in 收到的从机应答帧的头
+ * @param {uint16_t} i_len 收到的从机应答帧长度
+ * @param {uint8_t} *out
+ * @param {uint16_t} o_len
+ * @return {*} 0:正常 <0:不正常
+ */
+static int _bModbusRTUMasterParse(void *attr, uint8_t *in, uint16_t i_len, uint8_t *out,
+                                  uint16_t o_len)
 {
-    if (psrc == NULL)
-    {
-        return -1;
-    }
-    bMB_RTU_ReadRegsAck_t *phead = (bMB_RTU_ReadRegsAck_t *)psrc;
+    int              retval = 0;
+    int              len    = 0;
+    int              i      = 0;
+    uint16_t         crc    = 0;
+    bProtocolAttr_t *pattr  = (bProtocolAttr_t *)attr;
+    bModbusCbParm_t  param;
 
-    if ((sizeof(bMB_RTU_ReadRegsAck_t) - 1 + phead->len + 2) > len)
+    if (i_len < 2)
     {
-        return -1;
+        return MODBUS_LEN_ERR;
     }
 
-    uint16_t crc  = _bMBCRC16(psrc, sizeof(bMB_RTU_ReadRegsAck_t) - 1 + phead->len);
-    uint16_t crc2 = ((uint16_t *)(psrc + sizeof(bMB_RTU_ReadRegsAck_t) - 1 + phead->len))[0];
-    if (crc != crc2)
+    if (in[1] == MODBUS_RTU_READ_REGS)
     {
-        b_log_e("crc error %x %x\r\n", crc, crc2);
-        return -1;
+        bModbusMasterSendReadRegsAck_t *r_ack = (bModbusMasterSendReadRegsAck_t *)in;
+        len                                   = sizeof(bModbusMasterSendReadRegsAck_t) + r_ack->len;
+        if (i_len < len)
+        {
+            return MODBUS_LEN_ERR;
+        }
+        crc = _bMBCRC16(in, len - 2);
+        if (crc != r_ack->param[r_ack->len / 2])
+        {
+            return MODBUS_FRAME_HEAD_ERR;
+        }
+        param.slave_id = pattr->reserved;  // 用户层保证该地址为从机的实际设备地址
+        param.func_code = r_ack->func;
+        param.base_reg  = 0;
+        param.reg_num   = r_ack->len / 2;
+        for (i = 0; i < param.reg_num; i++)
+        {
+            r_ack->param[i] = L2B_B2L_16b(r_ack->param[i]);
+        }
+        param.reg_value = (uint16_t *)r_ack->param;
+        B_SAFE_INVOKE_RET(retval, pattr->callback, B_MODBUS_CMD_READ_REG, &param, pattr->arg);
+        if ((retval < 0) && (pattr->callback != NULL))
+        {
+            return MODBUS_CALLBACK_ERR;
+        }
     }
+    else if (in[1] == MODBUS_RTU_WRITE_REG)
+    {
+        bModbusMasterSendWriteRegAck_t *w_1_ack = (bModbusMasterSendWriteRegAck_t *)in;
+        len                                     = sizeof(bModbusMasterSendWriteRegAck_t);
+        if (i_len < len)
+        {
+            return MODBUS_LEN_ERR;
+        }
+        crc = _bMBCRC16(in, len - 2);
+        if (crc != w_1_ack->crc)
+        {
+            return MODBUS_FRAME_HEAD_ERR;
+        }
+        param.slave_id = pattr->reserved;  // 用户层保证该地址为从机的实际设备地址
+        param.func_code = w_1_ack->func;
+        param.base_reg  = L2B_B2L_16b(w_1_ack->reg);
+        param.reg_num   = 1;
+        w_1_ack->value  = L2B_B2L_16b(w_1_ack->value);
+        param.reg_value = (uint16_t *)&w_1_ack->value;
+        B_SAFE_INVOKE_RET(retval, pattr->callback, B_MODBUS_CMD_WRITE_REGS, &param, pattr->arg);
+        if ((retval < 0) && (pattr->callback != NULL))
+        {
+            return MODBUS_CALLBACK_ERR;
+        }
+    }
+    else if (in[1] == MODBUS_RTU_WRITE_REGS)
+    {
+        bModbusMasterSendWriteRegsAck_t *w_ack = (bModbusMasterSendWriteRegsAck_t *)in;
+        len                                    = sizeof(bModbusMasterSendWriteRegsAck_t);
+        if (i_len < len)
+        {
+            return MODBUS_LEN_ERR;
+        }
+        crc = _bMBCRC16(in, len - 2);
+        if (crc != w_ack->crc)
+        {
+            return MODBUS_FRAME_HEAD_ERR;
+        }
+        param.slave_id = pattr->reserved;  // 用户层保证该地址为从机的实际设备地址
+        param.func_code = w_ack->func;
+        param.base_reg  = L2B_B2L_16b(w_ack->reg);
+        param.reg_num   = L2B_B2L_16b(w_ack->num);
+        param.reg_value = NULL;
+        B_SAFE_INVOKE_RET(retval, pattr->callback, B_MODBUS_CMD_WRITE_REGS, &param, pattr->arg);
+        if ((retval < 0) && (pattr->callback != NULL))
+        {
+            return MODBUS_CALLBACK_ERR;
+        }
+    }
+    else
+    {
+        return MODBUS_CRC_ERR;
+    }
+
     return 0;
 }
 
-static int _bMB_CheckRTUWriteACK(uint8_t *psrc, uint16_t len)
+/**
+ * @description:
+ * @param {void} *attr
+ * @param {bProtoCmd_t} cmd
+ * @param {uint8_t} *buf
+ * 该数组同时将读写的参数按照小端传入,具体是什么数据类型,依据CMD来决定,获取后重新按照大端组帧
+ * @param {uint16_t} buf_len 长度需要至少和相应CMD的数据结构大小相等
+ * @return {*}
+ */
+static int _bModbusRTUMasterPackage(void *attr, bProtoCmd_t cmd, uint8_t *buf, uint16_t buf_len)
 {
-    if (psrc == NULL)
+    int      i   = 0;
+    int      len = 0;
+    uint16_t crc = 0;
+    if (buf == NULL || buf_len == 0)
     {
-        return -1;
+        return MODBUS_LEN_ERR;
     }
-    if (sizeof(bMB_RTU_WriteRegsAck_t) > len)
+
+    if (cmd == B_MODBUS_CMD_READ_REG)
     {
-        return -1;
+        bModbusMasterRead_t *param = (bModbusMasterRead_t *)buf;
+        len                        = sizeof(bModbusMasterRead_t) + 2;
+        if (buf_len < len)
+        {
+            return MODBUS_LEN_ERR;
+        }
+        param->base_reg = L2B_B2L_16b(param->base_reg);
+        param->reg_num  = L2B_B2L_16b(param->reg_num);
+        param->reserved = MODBUS_RTU_READ_REGS;
     }
-    uint16_t crc  = _bMBCRC16(psrc, sizeof(bMB_RTU_WriteRegsAck_t) - 2);
-    uint16_t crc2 = ((uint16_t *)(psrc + (sizeof(bMB_RTU_WriteRegsAck_t) - 2)))[0];
-    if (crc != crc2)
+    else if (cmd == B_MODBUS_CMD_WRITE_REG)
     {
-        b_log_e("crc error %x %x\r\n", crc, crc2);
-        return -1;
+        len = sizeof(bModbusMasterSendWriteReg_t);
+        if (buf_len < len)
+        {
+            return MODBUS_LEN_ERR;
+        }
+        bModbusMasterSendWriteReg_t *frame = (bModbusMasterSendWriteReg_t *)buf;
+        frame->func                        = MODBUS_RTU_WRITE_REG;
+        frame->reg                         = L2B_B2L_16b(frame->reg);
+        frame->value                       = L2B_B2L_16b(frame->value);
     }
+    else if (cmd == B_MODBUS_CMD_WRITE_REGS)
+    {
+        bModbusMasterWriteRegs_t *param = (bModbusMasterWriteRegs_t *)buf;
+        len                             = sizeof(bModbusMasterWriteRegs_t) + param->reg_num * 2;
+        if (buf_len < len)
+        {
+            return MODBUS_LEN_ERR;
+        }
+
+        bModbusMasterSendWriteRegs_t *frame = (bModbusMasterSendWriteRegs_t *)buf;
+        frame->len                          = param->reg_num * 2;
+        frame->func                         = MODBUS_RTU_WRITE_REGS;
+        frame->reg                          = L2B_B2L_16b(param->base_reg);
+        frame->num                          = L2B_B2L_16b(param->reg_num);
+        for (i = 0; i < frame->len / 2; i++)
+        {
+            frame->param[i] = L2B_B2L_16b(frame->param[i]);
+        }
+    }
+    else
+    {
+        return MODBUS_FRAME_HEAD_ERR;
+    }
+
+    if (len > 0)
+    {
+        crc          = _bMBCRC16(buf, len - 2);
+        buf[len - 2] = ((crc >> 0) & 0xff);
+        buf[len - 1] = ((crc >> 8) & 0xff);
+    }
+
+    return len;
+}
+
+/**
+ * @description:
+ * 从机收到的MODBUS帧解析是否正确?即主机的发送,此为原始的大端输入,解析正确后转换为小端,调用回调来更新寄存器表
+ * @param {void} *attr
+ * @param {uint8_t} *in
+ * @param {uint16_t} i_len
+ * @param {uint8_t} *out
+ * @param {uint16_t} o_len
+ * @return {*} -1长度不对 -2帧头错误 -3校验错误 -4格式错误 -5操作非法地址
+ */
+static int _bModbusRTUSlaveParse(void *attr, uint8_t *in, uint16_t i_len, uint8_t *out,
+                                 uint16_t o_len)
+{
+    int              retval = 0;
+    int              len    = 0;
+    uint16_t         crc    = 0;
+    bProtocolAttr_t *pattr  = (bProtocolAttr_t *)attr;
+    bModbusCbParm_t  param;
+    bModbusInf_t     modbus_inf;
+
+    if (i_len < 2)
+    {
+        return MODBUS_LEN_ERR;
+    }
+
+    if ((in[0] != pattr->reserved) && (in[0] != ALL_SLAVE_ADDR))
+    {
+        return MODBUS_FRAME_HEAD_ERR;
+    }
+
+    memset(&modbus_inf, 0, sizeof(bModbusInf_t));
+
+    if (in[1] == MODBUS_RTU_READ_REGS)
+    {
+        bModbusSlaveRecvReadRegs_t *r = (bModbusSlaveRecvReadRegs_t *)in;
+        len                           = sizeof(bModbusSlaveRecvReadRegs_t);
+        if (i_len < len)
+        {
+            return MODBUS_LEN_ERR;
+        }
+        crc = _bMBCRC16(in, len - 2);
+        if (crc != r->crc)
+        {
+            return MODBUS_CRC_ERR;
+        }
+        param.slave_id = pattr->reserved;  // 用户层保证该地址为从机的实际设备地址
+        param.func_code = r->func;
+        param.base_reg  = L2B_B2L_16b(r->reg);
+        param.reg_num   = L2B_B2L_16b(r->num);
+        if (param.reg_num > MODBUS_READ_REG_MAX)
+        {
+            return MODBUS_MAX_REGNUM_ERR;
+        }
+        if ((param.base_reg >= MY_DEVICE_MODBUS_REG_NUM) ||
+            ((param.base_reg + param.reg_num) >= MY_DEVICE_MODBUS_REG_NUM + 1))
+        {
+            return MODBUS_ILLEGAL_REG_ERR;
+        }
+        param.reg_value = NULL;
+
+        B_SAFE_INVOKE_RET(retval, pattr->get_info, B_PROTO_INFO_MODBUS_REG_PERMISSION,
+                          (uint8_t *)&modbus_inf, sizeof(bModbusInf_t));
+        if ((retval >= 0) && (pattr->get_info != NULL))
+        {
+            // 判定待操作的寄存器指定动作与读写权限匹配?
+            for (uint32_t i = param.base_reg; i <= param.base_reg + param.reg_num - 1; i++)
+            {
+                if (modbus_inf.ArrayPtr[i][0] == 0)
+                {
+                    return MODBUS_REG_OPERATION_ERR;
+                }
+            }
+        }
+
+        B_SAFE_INVOKE_RET(retval, pattr->callback, B_MODBUS_CMD_READ_REG, &param, pattr->arg);
+        if ((retval < 0) && (pattr->callback != NULL))
+        {
+            return MODBUS_CALLBACK_ERR;
+        }
+    }
+    else if (in[1] == MODBUS_RTU_WRITE_REG)
+    {
+        bModbusSlaveRecvWriteReg_t *w_1 = (bModbusSlaveRecvWriteReg_t *)in;
+        len                             = sizeof(bModbusSlaveRecvWriteReg_t);
+        if (i_len < len)
+        {
+            return MODBUS_LEN_ERR;
+        }
+        crc = _bMBCRC16(in, len - 2);
+        if (crc != w_1->crc)
+        {
+            return MODBUS_CRC_ERR;
+        }
+        param.slave_id = pattr->reserved;  // 用户层保证该地址为从机的实际设备地址
+        param.func_code = w_1->func;
+        param.base_reg  = L2B_B2L_16b(w_1->reg);
+        param.reg_num   = 1;
+        if (param.base_reg >= MY_DEVICE_MODBUS_REG_NUM)
+        {
+            return MODBUS_ILLEGAL_REG_ERR;
+        }
+        w_1->value      = L2B_B2L_16b(w_1->value);
+        param.reg_value = &w_1->value;
+
+        B_SAFE_INVOKE_RET(retval, pattr->get_info, B_PROTO_INFO_MODBUS_REG_PERMISSION,
+                          (uint8_t *)&modbus_inf, sizeof(bModbusInf_t));
+        if ((retval >= 0) && (pattr->get_info != NULL))
+        {
+            // 判定待操作的寄存器指定动作与读写权限匹配?
+            for (uint32_t i = param.base_reg; i <= param.base_reg + param.reg_num - 1; i++)
+            {
+                if (modbus_inf.ArrayPtr[i][1] == 0)
+                {
+                    return MODBUS_REG_OPERATION_ERR;
+                }
+            }
+        }
+
+        B_SAFE_INVOKE_RET(retval, pattr->callback, B_MODBUS_CMD_WRITE_REGS, &param, pattr->arg);
+        if ((retval < 0) && (pattr->callback != NULL))
+        {
+            return MODBUS_CALLBACK_ERR;
+        }
+    }
+    else if (in[1] == MODBUS_RTU_WRITE_REGS)
+    {
+        bModbusSlaveRecvWriteRegs_t *w = (bModbusSlaveRecvWriteRegs_t *)in;
+        len                            = sizeof(bModbusSlaveRecvWriteRegs_t) + w->len;
+        if (i_len < len)
+        {
+            return MODBUS_LEN_ERR;
+        }
+        crc = _bMBCRC16(in, len - 2);
+        if (crc != w->param[w->len / 2])
+        {
+            return MODBUS_CRC_ERR;
+        }
+        param.slave_id = pattr->reserved;  // 用户层保证该地址为从机的实际设备地址
+        param.func_code = w->func;
+        param.base_reg  = L2B_B2L_16b(w->reg);
+        param.reg_num   = L2B_B2L_16b(w->num);
+        if (param.reg_num > MODBUS_WRITE_REG_MAX)
+        {
+            return MODBUS_MAX_REGNUM_ERR;
+        }
+        if ((param.reg_num * 2) != w->len)
+        {
+            return MODBUS_MAX_REGNUM_ERR;
+        }
+        if ((param.base_reg >= MY_DEVICE_MODBUS_REG_NUM) ||
+            ((param.base_reg + param.reg_num) >= MY_DEVICE_MODBUS_REG_NUM + 1))
+        {
+            return MODBUS_ILLEGAL_REG_ERR;
+        }
+        for (uint16_t i = 0; i < param.reg_num; i++)
+        {
+            (w->param)[i] = L2B_B2L_16b((w->param)[i]);
+        }
+        param.reg_value = w->param;
+
+        B_SAFE_INVOKE_RET(retval, pattr->get_info, B_PROTO_INFO_MODBUS_REG_PERMISSION,
+                          (uint8_t *)&modbus_inf, sizeof(bModbusInf_t));
+        if ((retval >= 0) && (pattr->get_info != NULL))
+        {
+            // 判定待操作的寄存器指定动作与读写权限匹配?
+            for (uint32_t i = param.base_reg; i <= param.base_reg + param.reg_num - 1; i++)
+            {
+                if (modbus_inf.ArrayPtr[i][1] == 0)
+                {
+                    return MODBUS_REG_OPERATION_ERR;
+                }
+            }
+        }
+
+        B_SAFE_INVOKE_RET(retval, pattr->callback, B_MODBUS_CMD_WRITE_REGS, &param, pattr->arg);
+        if ((retval < 0) && (pattr->callback != NULL))
+        {
+            return MODBUS_CALLBACK_ERR;
+        }
+    }
+    else
+    {
+        return MODBUS_MAX_REGNUM_ERR;
+    }
+
     return 0;
 }
 
+/**
+ * @description: 将信息除去校验位按照位置还有小端存在buf内,该函数会判定格式后大小端转换
+ * @param {void} *attr
+ * @param {bProtoCmd_t} cmd
+ * @param {uint8_t} *buf
+ * 该数组同时将读写的参数按照小端传入,具体是什么数据类型,依据CMD来决定,判定帧格式成功后重新按照大端组帧
+ * @param {uint16_t} buf_len
+ * @return {*} -1长度不对 -2帧头错误 -3校验错误 -4格式错误 -5操作非法地址 -6调用错误
+ */
+static int _bModbusRTUSlavePackage(void *attr, bProtoCmd_t cmd, uint8_t *buf, uint16_t buf_len)
+{
+    uint16_t         i     = 0;
+    int              len   = 0;
+    uint16_t         crc   = 0;
+    bProtocolAttr_t *pattr = (bProtocolAttr_t *)attr;
+
+    if (buf == NULL || buf_len == 0)
+    {
+        return MODBUS_LEN_ERR;
+    }
+
+    if ((buf[0] != pattr->reserved) && (buf[0] == ALL_SLAVE_ADDR))
+    {
+        return MODBUS_FRAME_HEAD_ERR;
+    }
+
+    if (cmd == B_MODBUS_CMD_READ_REG)
+    {
+        bModbusSlaveRead_t *param = (bModbusSlaveRead_t *)buf;
+        len                       = sizeof(bModbusSlaveRead_t) + param->len;
+        if (buf_len < len)
+        {
+            return MODBUS_LEN_ERR;
+        }
+        if (param->reserved != MODBUS_RTU_READ_REGS)
+        {
+            return MODBUS_MAX_REGNUM_ERR;
+        }
+        if ((param->len % 2 != 0) && (param->len != 0))
+        {
+            return MODBUS_LEN_ERR;
+        }
+        for (i = 0; i < param->len / 2; i++)
+        {
+            param->reg_value[i] = L2B_B2L_16b(param->reg_value[i]);
+        }
+    }
+    else if (cmd == B_MODBUS_CMD_WRITE_REG)
+    {
+        bModbusSlaveWriteReg_t *frame = (bModbusSlaveWriteReg_t *)buf;
+        len                           = sizeof(bModbusSlaveWriteReg_t);
+        if (buf_len < len)
+        {
+            return MODBUS_LEN_ERR;
+        }
+        if (frame->reserved != MODBUS_RTU_WRITE_REG)
+        {
+            return MODBUS_MAX_REGNUM_ERR;
+        }
+        if (frame->base_reg >= MY_DEVICE_MODBUS_REG_NUM)
+        {
+            return MODBUS_ILLEGAL_REG_ERR;
+        }
+        frame->base_reg  = L2B_B2L_16b(frame->base_reg);
+        frame->reg_value = L2B_B2L_16b(frame->reg_value);
+    }
+    else if (cmd == B_MODBUS_CMD_WRITE_REGS)
+    {
+        bModbusSlaveWriteRegs_t *frame = (bModbusSlaveWriteRegs_t *)buf;
+        len                            = sizeof(bModbusSlaveWriteRegs_t);
+        if (buf_len < len)
+        {
+            return MODBUS_LEN_ERR;
+        }
+        if (frame->reserved != MODBUS_RTU_WRITE_REGS)
+        {
+            return MODBUS_MAX_REGNUM_ERR;
+        }
+        if ((frame->base_reg >= MY_DEVICE_MODBUS_REG_NUM) ||
+            ((frame->base_reg + frame->reg_num) >= MY_DEVICE_MODBUS_REG_NUM + 1))
+        {
+            return MODBUS_ILLEGAL_REG_ERR;
+        }
+        frame->base_reg = L2B_B2L_16b(frame->base_reg);
+        frame->reg_num  = L2B_B2L_16b(frame->reg_num);
+    }
+    else
+    {
+        return MODBUS_CALLBACK_ERR;
+    }
+
+    if (len > 0)
+    {
+        crc          = _bMBCRC16(buf, len - 2);
+        buf[len - 2] = ((crc >> 0) & 0xff);
+        buf[len - 1] = ((crc >> 8) & 0xff);
+    }
+
+    return len;
+}
 /**
  * \}
  */
@@ -202,110 +705,21 @@ static int _bMB_CheckRTUWriteACK(uint8_t *psrc, uint16_t len)
  * \addtogroup MODBUS_Exported_Functions
  * \{
  */
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section b_srv_protocol
+#endif
+bPROTOCOL_REG_INSTANCE("modbus_master", _bModbusRTUMasterParse, _bModbusRTUMasterPackage);
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section
+#endif
 
-/**
- * \brief Modbus RTU Read Regiter
- * \param pModbusInstance Pointr to the modbus instance
- * \param addr Device address
- * \param func Function code
- * \param reg  Register address
- * \param num  the number of Register to be read
- * \retval Result
- *          \arg 0  OK
- *          \arg -1 ERR
- */
-int bMB_ReadRegs(bModbusInstance_t *pModbusInstance, uint8_t addr, uint8_t func, uint16_t reg,
-                 uint16_t num)
-{
-    bMB_RTU_ReadRegs_t wd;
-    if (pModbusInstance == NULL)
-    {
-        return -1;
-    }
-    wd.addr = addr;
-    wd.func = func;
-    wd.reg  = L2B_B2L_16b(reg);
-    wd.num  = L2B_B2L_16b(num);
-    wd.crc  = _bMBCRC16((uint8_t *)&wd, sizeof(bMB_RTU_ReadRegs_t) - sizeof(wd.crc));
-    pModbusInstance->f((uint8_t *)&wd, sizeof(bMB_RTU_ReadRegs_t));
-    return 0;
-}
-
-/**
- * \brief Modbus write regs
- * \param pModbusInstance Pointr to the modbus instance
- * \param addr Device address
- * \param func Function code
- * \param reg  Register address
- * \param num  The number of Register to write to
- * \param reg_value  Pointer to the register value
- * \retval Result
- *          \arg 0  OK
- *          \arg -1 ERR
- */
-int bMB_WriteRegs(bModbusInstance_t *pModbusInstance, uint8_t addr, uint8_t func, uint16_t reg,
-                  uint16_t num, uint16_t *reg_value)
-{
-    bMB_RTU_WriteRegs_t *phead   = (bMB_RTU_WriteRegs_t *)bMB_SendBuff;
-    int                  i       = 0;
-    uint16_t             tmp_len = 0;
-    if (pModbusInstance == NULL || reg_value == NULL)
-    {
-        return -1;
-    }
-    phead->addr = addr;
-    phead->func = func;
-    phead->reg  = L2B_B2L_16b(reg);
-    phead->num  = L2B_B2L_16b(num);
-    phead->len  = num * 2;
-    memcpy(phead->param, (uint8_t *)reg_value, phead->len);
-    for (i = 0; i < num; i++)
-    {
-        ((uint16_t *)phead->param)[i] = L2B_B2L_16b(((uint16_t *)phead->param)[i]);
-    }
-    tmp_len                                 = sizeof(bMB_RTU_WriteRegs_t) - 1 + phead->len;
-    ((uint16_t *)&bMB_SendBuff[tmp_len])[0] = _bMBCRC16(bMB_SendBuff, tmp_len);
-    pModbusInstance->f(bMB_SendBuff, tmp_len + 2);
-    return 0;
-}
-
-int bMB_FeedReceivedData(bModbusInstance_t *pModbusInstance, uint8_t *pbuf, uint16_t len)
-{
-    bMB_SlaveDeviceData_t   _data;
-    int                     i      = 0;
-    int                     retval = -1;
-    bMB_RTU_ReadRegsAck_t * pr     = (bMB_RTU_ReadRegsAck_t *)pbuf;
-    bMB_RTU_WriteRegsAck_t *pw     = (bMB_RTU_WriteRegsAck_t *)pbuf;
-    if (pbuf == NULL)
-    {
-        return -1;
-    }
-    if (_bMB_CheckRTUReadACK(pbuf, len) == 0)
-    {
-        _data.type                      = 0;
-        _data.result.r_result.func      = pr->func;
-        _data.result.r_result.reg_num   = pr->len / 2;
-        _data.result.r_result.reg_value = (uint16_t *)pr->buf;
-
-        for (i = 0; i < _data.result.r_result.reg_num; i++)
-        {
-            _data.result.r_result.reg_value[i] = L2B_B2L_16b(_data.result.r_result.reg_value[i]);
-        }
-        pModbusInstance->cb(&_data);
-        retval = 0;
-    }
-    else if (_bMB_CheckRTUWriteACK(pbuf, len) == 0)
-    {
-        _data.type                    = 1;
-        _data.result.w_result.func    = pw->func;
-        _data.result.w_result.reg     = L2B_B2L_16b(pw->reg);
-        _data.result.w_result.reg_num = L2B_B2L_16b(pw->num);
-        pModbusInstance->cb(&_data);
-        retval = 0;
-    }
-    return retval;
-}
-
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section b_srv_protocol
+#endif
+bPROTOCOL_REG_INSTANCE("modbus_slave", _bModbusRTUSlaveParse, _bModbusRTUSlavePackage);
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section
+#endif
 /**
  * \}
  */

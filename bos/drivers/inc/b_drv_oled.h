@@ -57,7 +57,7 @@ extern "C" {
  * \defgroup OLED_Exported_TypesDefinitions
  * \{
  */
-
+//<HALIF 2 SPI_I2C
 typedef struct
 {
     union
@@ -68,7 +68,6 @@ typedef struct
     uint8_t is_spi;
 } bOLED_HalIf_t;
 
-typedef bDriverInterface_t bOLED_Driver_t;
 /**
  * \}
  */

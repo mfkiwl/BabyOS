@@ -49,6 +49,7 @@
  * \defgroup HAL_Private_Variables
  * \{
  */
+static volatile uint32_t bSysTickOvr   = 0;
 static volatile uint32_t bSysTick      = 0;
 static uint32_t          bUsDelayParam = 10;
 /**
@@ -77,23 +78,40 @@ static void _bHalUpdateDelayParam()
  * \addtogroup HAL_Exported_Functions
  * \{
  */
-#if _DEBUG_ENABLE
-int fputc(int c, FILE *p)
+#if defined(__WEAKDEF)
+__WEAKDEF void bHalUserInit()
 {
-    uint8_t ch = c & 0xff;
-    bHalUartDriver.pSend(HAL_LOG_UART, &ch, 1);
-    return c;
+    ;
+}
+#else
+static void (*pbHalUserInitFunc)(void) = NULL;
+void bHalUserInit()
+{
+    if (pbHalUserInitFunc)
+    {
+        pbHalUserInitFunc();
+    }
+}
+
+void bHalRegUserInit(void (*cb)(void))
+{
+    pbHalUserInitFunc = cb;
 }
 #endif
 
 void bHalInit()
 {
     _bHalUpdateDelayParam();
+    bHalUserInit();
 }
 
 void bHalIncSysTick()
 {
     bSysTick += 1;
+    if (bSysTick == 0)
+    {
+        bSysTickOvr += 1;
+    }
 }
 
 uint32_t bHalGetSysTick()
@@ -101,14 +119,16 @@ uint32_t bHalGetSysTick()
     return bSysTick;
 }
 
+uint64_t bHalGetSysTickPlus()
+{
+    uint64_t tick = bSysTickOvr;
+    tick          = bSysTick + (tick << (8 * sizeof(uint32_t)));
+    return tick;
+}
+
 void bHalDelayMs(uint16_t xms)
 {
-    uint32_t tickstart = bSysTick;
-    uint32_t wait      = MS2TICKS(xms);
-    while ((bSysTick - tickstart) < wait)
-    {
-        ;
-    }
+    bHalDelayUs(1000 * xms);
 }
 
 void bHalDelayUs(uint32_t xus)

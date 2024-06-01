@@ -31,8 +31,11 @@
 
 /*Includes ----------------------------------------------*/
 #include "modules/inc/b_mod_protocol.h"
-#if _PROTO_ENABLE
+#if (defined(_PROTO_ENABLE) && (_PROTO_ENABLE == 1))
 #include <string.h>
+
+#include "utils/inc/b_util_log.h"
+
 /**
  * \addtogroup BABYOS
  * \{
@@ -61,9 +64,9 @@
  * \defgroup PROTOCOL_Private_Defines
  * \{
  */
-#if _PROTO_ENCRYPT_ENABLE
+#if (defined(_PROTO_ENCRYPT_ENABLE) && (_PROTO_ENCRYPT_ENABLE == 1))
 #define _PROTO_TEA_DELTA 0x9e3779b9
-const static uint32_t Keys[4] = {_SECRET_KEY1, _SECRET_KEY2, _SECRET_KEY3, _SECRET_KEY4};
+const static uint32_t Keys[4] = {SECRET_KEY1, SECRET_KEY2, SECRET_KEY3, SECRET_KEY4};
 #endif
 /**
  * \}
@@ -83,7 +86,6 @@ const static uint32_t Keys[4] = {_SECRET_KEY1, _SECRET_KEY2, _SECRET_KEY3, _SECR
  * \{
  */
 
-static bProtocolInfo_t bProtocolInfo;
 /**
  * \}
  */
@@ -113,7 +115,7 @@ static uint8_t _bProtocolCalCheck(uint8_t *pbuf, bProtoLen_t len)
     return tmp;
 }
 
-#if _PROTO_ENCRYPT_ENABLE
+#if (defined(_PROTO_ENCRYPT_ENABLE) && (_PROTO_ENCRYPT_ENABLE == 1))
 static void _bProtocolEncryptGroup(uint32_t *text, uint32_t *key)
 {
     uint32_t sum = 0, v0 = text[0], v1 = text[1];
@@ -178,6 +180,155 @@ static void _bProtocolDecrypt(uint8_t *text, uint32_t size)
 }
 #endif
 
+static int _bProtocolPack(bProtocolAttr_t *pattr, uint8_t cmd, uint8_t *param,
+                          bProtoLen_t param_size, uint8_t *pbuf, uint16_t buf_len)
+{
+    int              length = 0;
+    bProtoID_t       id     = 0;
+    bProtocolHead_t *phead;
+
+    if (pbuf == NULL)
+    {
+        return 0;
+    }
+
+    if ((param == NULL && param_size > 0) || ((sizeof(bProtocolHead_t) + param_size + 1) > buf_len))
+    {
+        return -1;
+    }
+    B_SAFE_INVOKE(pattr->get_info, B_PROTO_INFO_DEVICE_ID, (uint8_t *)&id, sizeof(bProtoID_t));
+    phead            = (bProtocolHead_t *)pbuf;
+    phead->head      = PROTOCOL_HEAD;
+    phead->device_id = id;
+    phead->cmd       = cmd;
+    phead->len       = 1 + param_size;
+    memcpy(&pbuf[sizeof(bProtocolHead_t)], param, param_size);
+    length           = sizeof(bProtocolHead_t) + phead->len;
+    pbuf[length - 1] = _bProtocolCalCheck(pbuf, length - 1);
+#if (defined(_PROTO_ENCRYPT_ENABLE) && (_PROTO_ENCRYPT_ENABLE == 1))
+    _bProtocolEncrypt(pbuf, length);
+#endif
+    return length;
+}
+
+static int _bProtocolParse(void *attr, uint8_t *in, uint16_t i_len, uint8_t *out, uint16_t o_len)
+{
+    bProtocolAttr_t *pattr = (bProtocolAttr_t *)attr;
+    bProtocolHead_t *phead = (bProtocolHead_t *)in;
+    bProtoID_t       id    = 0;
+    int              length;
+    uint8_t          crc;
+
+    if (in == NULL || i_len < (sizeof(bProtocolHead_t) + 1))
+    {
+        return -1;
+    }
+#if (defined(_PROTO_ENCRYPT_ENABLE) && (_PROTO_ENCRYPT_ENABLE == 1))
+    _bProtocolDecrypt(in, i_len);
+#endif
+    B_SAFE_INVOKE(pattr->get_info, B_PROTO_INFO_DEVICE_ID, (uint8_t *)&id, sizeof(bProtoID_t));
+    if (phead->head != PROTOCOL_HEAD ||
+        (phead->device_id != id && (phead->device_id != INVALID_ID) && (id != INVALID_ID)))
+    {
+        return -1;
+    }
+    length = phead->len + sizeof(bProtocolHead_t);
+    if (length > i_len)
+    {
+        return -1;
+    }
+    crc = _bProtocolCalCheck(in, length - 1);
+    if (crc != in[length - 1])
+    {
+        b_log_e("crc error!%d %d", crc, in[length - 1]);
+        return -1;
+    }
+    if (phead->cmd == PROTO_CMD_TEST)
+    {
+        ;
+    }
+    else if (phead->cmd == PROTO_CMD_UTC)
+    {
+        bProtoUtc_t utc;
+        uint32_t   *dat = (uint32_t *)(&in[sizeof(bProtocolHead_t)]);
+        utc.utc         = *dat;
+        utc.timezone    = 8.0;
+        B_SAFE_INVOKE(pattr->callback, B_PROTO_UTC, &utc, pattr->arg);
+    }
+    else if (phead->cmd == PROTO_CMD_FW_INFO)
+    {
+        bProtoFileInfo_t info;
+        bProtoFWParam_t *fw = (bProtoFWParam_t *)(&in[sizeof(bProtocolHead_t)]);
+        info.size           = fw->size;
+        info.fcrc32         = fw->f_crc32;
+        memcpy(&info.name[0], fw->filename, sizeof(fw->filename));
+        B_SAFE_INVOKE(pattr->callback, B_PROTO_OTA_FILE_INFO, &info, pattr->arg);
+    }
+    else if (phead->cmd == PROTO_CMD_TRANS_FILE)
+    {
+        bProtoFileInfo_t        info;
+        bProtoTransFileParam_t *param = (bProtoTransFileParam_t *)(&in[sizeof(bProtocolHead_t)]);
+
+        info.size   = param->size;
+        info.fcrc32 = param->f_crc32;
+        B_SAFE_INVOKE(pattr->callback, B_PROTO_TRANS_FILE_INFO, &info, pattr->arg);
+
+        bProtoFileLocation_t location;
+        location.dev    = param->dev_no;
+        location.offset = param->offset;
+        B_SAFE_INVOKE(pattr->callback, B_PROTO_SET_FILE_LOCATION, &location, pattr->arg);
+    }
+    else if (phead->cmd == PROTO_CMD_FDATA)
+    {
+        bProtoFileData_t    dat;
+        bProtoFDataParam_t *param = (bProtoFDataParam_t *)(&in[sizeof(bProtocolHead_t)]);
+        dat.offset                = param->seq * 512;
+        dat.size                  = 512;
+        dat.dat                   = param->data;
+        B_SAFE_INVOKE(pattr->callback, B_PROTO_FILE_DATA, &dat, pattr->arg);
+    }
+
+    length = 0;
+    if (PROTOCOL_NEED_DEFAULT_ACK(phead->cmd))
+    {
+        length = _bProtocolPack(pattr, phead->cmd, NULL, 0, out, o_len);
+    }
+
+    return length;
+}
+
+static int _bProtocolPackage(void *attr, bProtoCmd_t cmd, uint8_t *buf, uint16_t buf_len)
+{
+    int      ret = -1;
+    uint8_t  tmp_buf[32];
+    uint16_t tmp_size  = 0;
+    uint8_t  proto_cmd = 0;
+
+    if (cmd == B_PROTO_REQ_FILE_DATA)
+    {
+        bProtoReqFileData_t req;
+        req.offset                              = ((bProtoReqFileData_t *)buf)->offset;
+        req.size                                = ((bProtoReqFileData_t *)buf)->size;
+        ((bProtoReqFDataParam_t *)tmp_buf)->seq = req.offset / 512;
+        tmp_size                                = sizeof(bProtoReqFDataParam_t);
+        proto_cmd                               = PROTO_CMD_FDATA;
+    }
+    else if (cmd == B_PROTO_TRANS_FILE_RESULT)
+    {
+        uint8_t result                              = 0;
+        result                                      = buf[0];
+        ((bProtoOTAResultParam_t *)tmp_buf)->result = result;
+        tmp_size                                    = sizeof(bProtoOTAResultParam_t);
+        proto_cmd                                   = PROTO_CMD_OTA_RESULT;
+    }
+    else
+    {
+        return 0;
+    }
+    ret = _bProtocolPack(attr, proto_cmd, tmp_buf, tmp_size, buf, buf_len);
+    return ret;
+}
+
 /**
  * \}
  */
@@ -186,113 +337,13 @@ static void _bProtocolDecrypt(uint8_t *text, uint32_t size)
  * \addtogroup PROTOCOL_Exported_Functions
  * \{
  */
-
-/**
- * \brief Initialize protocol instance
- * \param id system id
- * \param f Dispatch Function \ref pdispatch
- * \retval Result
- *          \arg 0  OK
- *          \arg -1 ERR
- */
-int bProtocolInit(bProtoID_t id, pdispatch f)
-{
-    if (f == NULL)
-    {
-        return -1;
-    }
-    bProtocolInfo.id = id;
-    bProtocolInfo.f  = f;
-    return 0;
-}
-
-/**
- * \brief Check ID and call dispatch function
- * \param pbuf Pointer to data buffer
- * \param len Amount of data
- * \retval Result
- *          \arg 0  OK
- *          \arg -1 ERR
- */
-int bProtocolParse(uint8_t *pbuf, bProtoLen_t len)
-{
-    bProtocolHead_t *phead = (bProtocolHead_t *)pbuf;
-    int              length;
-    uint8_t          crc;
-    if (pbuf == NULL || len < (sizeof(bProtocolHead_t) + 1))
-    {
-        return -1;
-    }
-#if _PROTO_ENCRYPT_ENABLE
-    _bProtocolDecrypt(pbuf, len);
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section b_srv_protocol
 #endif
-    if (phead->head != PROTOCOL_HEAD ||
-        (phead->device_id != bProtocolInfo.id && (phead->device_id != INVALID_ID) &&
-         (bProtocolInfo.id != INVALID_ID)))
-    {
-        return -1;
-    }
-
-    length = phead->len + sizeof(bProtocolHead_t);
-    if (length > len)
-    {
-        return -1;
-    }
-    crc = _bProtocolCalCheck(pbuf, length - 1);
-    if (crc != pbuf[length - 1])
-    {
-        b_log_e("crc error!%d %d", crc, pbuf[length - 1]);
-        return -1;
-    }
-    return bProtocolInfo.f(phead->cmd, &pbuf[sizeof(bProtocolHead_t)], phead->len - 1);
-}
-
-/**
- * \brief Call this function after system ID changed
- * \param id System ID
- * \retval Result
- *          \arg 0  OK
- *          \arg -1 ERR
- */
-int bProtocolSetID(bProtoID_t id)
-{
-    bProtocolInfo.id = id;
-    return 0;
-}
-
-/**
- * \brief pack and start a TX request
- * \param cmd Protocol command
- * \param param Pointer to the command param
- * \param param_size size of the param
- * \param pbuf Pointer to the buffer that save the packed data
- * \retval Result
- *          \arg >0 Amount of data in the pbuf
- *          \arg -1 ERR
- */
-int bProtocolPack(uint8_t cmd, uint8_t *param, bProtoLen_t param_size, uint8_t *pbuf)
-{
-    int              length = 0;
-    bProtocolHead_t *phead;
-
-    if ((param == NULL && param_size > 0) || pbuf == NULL)
-    {
-        return -1;
-    }
-    phead            = (bProtocolHead_t *)pbuf;
-    phead->head      = PROTOCOL_HEAD;
-    phead->device_id = bProtocolInfo.id;
-    phead->cmd       = cmd;
-    phead->len       = 1 + param_size;
-    memcpy(&pbuf[sizeof(bProtocolHead_t)], param, param_size);
-    length           = sizeof(bProtocolHead_t) + phead->len;
-    pbuf[length - 1] = _bProtocolCalCheck(pbuf, length - 1);
-#if _PROTO_ENCRYPT_ENABLE
-    _bProtocolEncrypt(pbuf, length);
+bPROTOCOL_REG_INSTANCE("bos", _bProtocolParse, _bProtocolPackage);
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section
 #endif
-    return length;
-}
-
 /**
  * \}
  */

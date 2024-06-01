@@ -40,7 +40,9 @@ extern "C" {
 
 #include "b_config.h"
 
-#if _YMODEM_ENABLE
+#if (defined(_YMODEM_ENABLE) && (_YMODEM_ENABLE == 1))
+
+#include "b_mod_proto_type.h"
 
 /**
  * \addtogroup BABYOS
@@ -62,39 +64,6 @@ extern "C" {
  * \{
  */
 
-typedef struct
-{
-    uint8_t soh;
-    uint8_t number;
-    uint8_t xnumber;
-    uint8_t dat[128];
-    uint8_t crc_h;
-    uint8_t crc_l;
-} bYmodem128Struct_t;
-
-typedef struct
-{
-    uint8_t stx;
-    uint8_t number;
-    uint8_t xnumber;
-    uint8_t dat[1024];
-    uint8_t crc_h;
-    uint8_t crc_l;
-} bYmodem1kStruct_t;
-
-typedef void (*pymcb_t)(uint8_t t, uint8_t *pbuf, uint16_t len);
-typedef void (*pymsend)(uint8_t cmd);
-
-typedef struct
-{
-    pymcb_t  cb;
-    pymsend  send_f;
-    uint8_t  statu;
-    uint8_t  tt_count;
-    uint8_t  next_number;
-    uint32_t tick;
-} bYmodemInfo_t;
-
 /**
  * \}
  */
@@ -112,9 +81,6 @@ typedef struct
 #define YMODEM_CAN 0x18
 #define YMODEM_C 0x43
 
-#define YMODEM_FILENAME 0
-#define YMODEM_FILEDATA 1
-
 /**
  * \}
  */
@@ -123,11 +89,6 @@ typedef struct
  * \defgroup YMODEM_Exported_Functions
  * \{
  */
-
-int bYmodemInit(pymcb_t fcb, pymsend fs);
-int bYmodemParse(uint8_t *pbuf, uint16_t len);
-int bYmodemStart(void);
-int bYmodemStop(void);
 
 /**
  * \}

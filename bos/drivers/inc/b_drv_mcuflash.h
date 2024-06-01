@@ -51,7 +51,10 @@ extern "C" {
  * \defgroup MCUFLASH_Exported_TypesDefinitions
  * \{
  */
-typedef bDriverInterface_t bMCUFLASH_Driver_t;
+typedef struct
+{
+    uint32_t reserved;
+} bMCUFLASH_HalIf_t;
 /**
  * \}
  */

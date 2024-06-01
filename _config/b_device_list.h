@@ -28,20 +28,47 @@
  * SOFTWARE.
  *******************************************************************************
  */
-
 /**
-           for example !
-
-/////B_DEVICE_REG(dev, driver_interface, desc);
+typedef enum
+{
+    B_DRIVER_NULL = 0,
+    B_DRIVER_LTC2662IUH_12,
+    B_DRIVER_ICM20948,
+    B_DRIVER_ICM42688P,
+    B_DRIVER_QMC5883L,
+    B_DRIVER_QMI8658A,
+    B_DRIVER_24CXX,
+    B_DRIVER_DS18B20,
+    B_DRIVER_ESP12F,
+    B_DRIVER_FM25CL,
+    B_DRIVER_ILI9320,
+    B_DRIVER_ILI9341,
+    B_DRIVER_KEY,
+    B_DRIVER_LIS3DH,
+    B_DRIVER_MATRIXKEYS,
+    B_DRIVER_MCUFLASH,
+    B_DRIVER_MCUMAC,
+    B_DRIVER_OLED,
+    B_DRIVER_PAJ7620U2,
+    B_DRIVER_PCF8574,
+    B_DRIVER_RS485,
+    B_DRIVER_SD,
+    B_DRIVER_SPIFLASH,
+    B_DRIVER_SSD1289,
+    B_DRIVER_ST7789,
+    B_DRIVER_TESTFLASH,
+    B_DRIVER_XPT2046,
+    B_DRIVER_APDS9930,
+    B_DRIVER_NUMBER
+} bDriverNumber_t;
+*/
+/**
+    B_DEVICE_REG(dev_1, bDriverNumber_t, "description")
+    .....
+    B_DEVICE_REG(dev_n, bDriverNumber_t, "description")
  */
 
-// B_DEVICE_REG(SSD1289, bSSD1289_Driver, "lcd")
-// B_DEVICE_REG(XPT2046, bXPT2046_Driver, "touch")
-// B_DEVICE_REG(SPIFLASH, bSPIFLASH_Driver[0], "flash")
-// B_DEVICE_REG(_24C02, b24CXX_Driver[0], "24c02")
-// B_DEVICE_REG(SD, bSD_Driver, "sd card")
-// B_DEVICE_REG(DS18B20, bDS18B20_Driver, "temp")
-// B_DEVICE_REG(MCUFLASH, bMCUFLASH_Driver, "st")
+B_DEVICE_REG(bTESTFLASH, B_DRIVER_TESTFLASH, "testflash")
 
 #undef B_DEVICE_REG
 

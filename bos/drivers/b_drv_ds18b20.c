@@ -57,7 +57,7 @@
  * \defgroup DS18B20_Private_Defines
  * \{
  */
-
+#define DRIVER_NAME DS18B20
 /**
  * \}
  */
@@ -75,8 +75,7 @@
  * \defgroup DS18B20_Private_Variables
  * \{
  */
-const static bDS18B20_HalIf_t bDS18B20_HalIf = HAL_DS18B20_IF;
-bDS18B20_Driver_t             bDS18B20_Driver;
+bDRIVER_HALIF_TABLE(bDS18B20_HalIf_t, DRIVER_NAME);
 /**
  * \}
  */
@@ -94,20 +93,20 @@ bDS18B20_Driver_t             bDS18B20_Driver;
  * \defgroup DS18B20_Private_Functions
  * \{
  */
-static uint8_t _bSbusReady()
+static uint8_t _bSbusReady(bDriverInterface_t *pdrv)
 {
     uint16_t cp     = 0;
     uint8_t  retval = 1;
-    bHalGPIODriver.pGpioWritePin(bDS18B20_HalIf.sBusIo.port, bDS18B20_HalIf.sBusIo.pin, 0);
-    bHalDelayUs(600);  // 480~960us
-    bHalGPIODriver.pGpioWritePin(bDS18B20_HalIf.sBusIo.port, bDS18B20_HalIf.sBusIo.pin, 1);
 
-    bHalGPIODriver.pGpioConfig(bDS18B20_HalIf.sBusIo.port, bDS18B20_HalIf.sBusIo.pin,
-                               B_HAL_GPIO_INPUT, B_HAL_GPIO_NOPULL);
+    bDRIVER_GET_HALIF(_if, bDS18B20_HalIf_t, pdrv);
+
+    bHalGpioWritePin(_if->port, _if->pin, 0);
+    bHalDelayUs(600);  // 480~960us
+    bHalGpioWritePin(_if->port, _if->pin, 1);
+
+    bHalGpioConfig(_if->port, _if->pin, B_HAL_GPIO_INPUT, B_HAL_GPIO_NOPULL);
     cp = 0;
-    while (((bHalGPIODriver.pGpioReadPin(bDS18B20_HalIf.sBusIo.port, bDS18B20_HalIf.sBusIo.pin)) ==
-            1) &&
-           (cp++ < 100))
+    while (((bHalGpioReadPin(_if->port, _if->pin)) == 1) && (cp++ < 100))
     {
         bHalDelayUs(1);
     }
@@ -116,80 +115,67 @@ static uint8_t _bSbusReady()
         retval = 0;
     }
     bHalDelayUs(250);  // 60~240us
-    bHalGPIODriver.pGpioConfig(bDS18B20_HalIf.sBusIo.port, bDS18B20_HalIf.sBusIo.pin,
-                               B_HAL_GPIO_OUTPUT, B_HAL_GPIO_NOPULL);
-    bHalGPIODriver.pGpioWritePin(bDS18B20_HalIf.sBusIo.port, bDS18B20_HalIf.sBusIo.pin, 1);
+    bHalGpioConfig(_if->port, _if->pin, B_HAL_GPIO_OUTPUT, B_HAL_GPIO_NOPULL);
+    bHalGpioWritePin(_if->port, _if->pin, 1);
     return retval;
 }
 
-static uint8_t _bSbusReadByte()
+static uint8_t _bSbusReadByte(bDriverInterface_t *pdrv)
 {
     uint8_t byte = 0;
     uint8_t bit  = 0;
     uint8_t i;
+
+    bDRIVER_GET_HALIF(_if, bDS18B20_HalIf_t, pdrv);
+
     for (i = 0; i < 8; i++)
     {
-        bHalGPIODriver.pGpioWritePin(bDS18B20_HalIf.sBusIo.port, bDS18B20_HalIf.sBusIo.pin, 0);
+        bHalGpioWritePin(_if->port, _if->pin, 0);
         bHalDelayUs(2);
-        bHalGPIODriver.pGpioWritePin(bDS18B20_HalIf.sBusIo.port, bDS18B20_HalIf.sBusIo.pin, 1);
+        bHalGpioWritePin(_if->port, _if->pin, 1);
 
-        bHalGPIODriver.pGpioConfig(bDS18B20_HalIf.sBusIo.port, bDS18B20_HalIf.sBusIo.pin,
-                                   B_HAL_GPIO_INPUT, B_HAL_GPIO_NOPULL);
+        bHalGpioConfig(_if->port, _if->pin, B_HAL_GPIO_INPUT, B_HAL_GPIO_NOPULL);
         bHalDelayUs(2);  // < 15us
-        bit  = bHalGPIODriver.pGpioReadPin(bDS18B20_HalIf.sBusIo.port, bDS18B20_HalIf.sBusIo.pin);
+        bit  = bHalGpioReadPin(_if->port, _if->pin);
         byte = (byte >> 1) | (bit << 7);
         bHalDelayUs(100);  // > 60us
 
-        bHalGPIODriver.pGpioConfig(bDS18B20_HalIf.sBusIo.port, bDS18B20_HalIf.sBusIo.pin,
-                                   B_HAL_GPIO_OUTPUT, B_HAL_GPIO_NOPULL);
-        bHalGPIODriver.pGpioWritePin(bDS18B20_HalIf.sBusIo.port, bDS18B20_HalIf.sBusIo.pin, 1);
+        bHalGpioConfig(_if->port, _if->pin, B_HAL_GPIO_OUTPUT, B_HAL_GPIO_NOPULL);
+        bHalGpioWritePin(_if->port, _if->pin, 1);
     }
     return byte;
 }
 
-static void _bSbusWriteByte(uint8_t dat)
+static void _bSbusWriteByte(bDriverInterface_t *pdrv, uint8_t dat)
 {
     uint8_t j, wbit = 0;
+    bDRIVER_GET_HALIF(_if, bDS18B20_HalIf_t, pdrv);
     for (j = 0; j < 8; j++)
     {
         wbit = dat & 0x1;
         dat >>= 1;
-        bHalGPIODriver.pGpioWritePin(bDS18B20_HalIf.sBusIo.port, bDS18B20_HalIf.sBusIo.pin, 0);
+        bHalGpioWritePin(_if->port, _if->pin, 0);
         bHalDelayUs(2);
-        bHalGPIODriver.pGpioWritePin(bDS18B20_HalIf.sBusIo.port, bDS18B20_HalIf.sBusIo.pin, wbit);
+        bHalGpioWritePin(_if->port, _if->pin, wbit);
         bHalDelayUs(100);  // 60~120us
-        bHalGPIODriver.pGpioWritePin(bDS18B20_HalIf.sBusIo.port, bDS18B20_HalIf.sBusIo.pin, 1);
+        bHalGpioWritePin(_if->port, _if->pin, 1);
         bHalDelayUs(2);
     }
 }
 
-static int _bDS18B20Start()
+static int _bDS18B20Start(bDriverInterface_t *pdrv)
 {
     int retval = -1;
-    if (_bSbusReady())
+    if (_bSbusReady(pdrv))
     {
-        _bSbusWriteByte(0xCC);
-        _bSbusWriteByte(0x44);
+        _bSbusWriteByte(pdrv, 0xCC);
+        _bSbusWriteByte(pdrv, 0x44);
         retval = 0;
     }
     return retval;
 }
 
-static int _bDS18B20Ctl(struct bDriverIf *pdrv, uint8_t cmd, void *param)
-{
-    int retval = -1;
-    switch (cmd)
-    {
-        case bCMD_SENSOR_START:
-            retval = _bDS18B20Start();
-            break;
-        default:
-            break;
-    }
-    return retval;
-}
-
-static int _bDS18B20Read(bDS18B20_Driver_t *pdrv, uint32_t off, uint8_t *pbuf, uint16_t len)
+static int _bDS18B20Read(bDriverInterface_t *pdrv, uint32_t off, uint8_t *pbuf, uint32_t len)
 {
     int16_t    temp_dig = 0;
     float      temp     = 0;
@@ -199,18 +185,29 @@ static int _bDS18B20Read(bDS18B20_Driver_t *pdrv, uint32_t off, uint8_t *pbuf, u
     {
         return -1;
     }
-    if (_bSbusReady())
+    if (pdrv->_private.v == 0)
     {
-        _bSbusWriteByte(0xCC);
-        _bSbusWriteByte(0xBE);
+        _bDS18B20Start(pdrv);
+        pdrv->_private.v = bHalGetSysTick();
+        return -1;
+    }
+    else if (bHalGetSysTick() - pdrv->_private.v < MS2TICKS(500))
+    {
+        return -2;
+    }
+    if (_bSbusReady(pdrv))
+    {
+        _bSbusWriteByte(pdrv, 0xCC);
+        _bSbusWriteByte(pdrv, 0xBE);
     }
     else
     {
         return -1;
     }
-    tml      = _bSbusReadByte();
-    tmh      = _bSbusReadByte();
-    temp_dig = ((int16_t)tmh) << 8;
+    pdrv->_private.v = 0;
+    tml              = _bSbusReadByte(pdrv);
+    tmh              = _bSbusReadByte(pdrv);
+    temp_dig         = ((int16_t)tmh) << 8;
     temp_dig |= tml;
     if (temp_dig < 0)
     {
@@ -234,18 +231,21 @@ static int _bDS18B20Read(bDS18B20_Driver_t *pdrv, uint32_t off, uint8_t *pbuf, u
  * \addtogroup DS18B20_Exported_Functions
  * \{
  */
-int bDS18B20_Init()
+int bDS18B20_Init(bDriverInterface_t *pdrv)
 {
-    bDS18B20_Driver.status = 0;
-    bDS18B20_Driver.read   = _bDS18B20Read;
-    bDS18B20_Driver.write  = NULL;
-    bDS18B20_Driver.open   = NULL;
-    bDS18B20_Driver.close  = NULL;
-    bDS18B20_Driver.ctl    = _bDS18B20Ctl;
+    bDRIVER_STRUCT_INIT(pdrv, DRIVER_NAME, bDS18B20_Init);
+    pdrv->read       = _bDS18B20Read;
+    pdrv->_private.v = 0;
     return 0;
 }
 
-bDRIVER_REG_INIT(bDS18B20_Init);
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section driver_init
+#endif
+bDRIVER_REG_INIT(B_DRIVER_DS18B20, bDS18B20_Init);
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section 
+#endif
 /**
  * \}
  */

@@ -57,18 +57,16 @@ extern "C" {
  * \defgroup SPIFLASH_Exported_TypesDefinitions
  * \{
  */
+//<HALIF 2 SPI_QSPI
 typedef struct
 {
     union
     {
-        //...  qspi reserved
-
-        bHalSPIIf_t _spi;
+        bHalQSPINumber_t _qspi;
+        bHalSPIIf_t      _spi;
     } _if;
     uint8_t is_spi;
 } bSPIFLASH_HalIf_t;
-
-typedef bDriverInterface_t bSPIFLASH_Driver_t;
 
 /**
  * \}

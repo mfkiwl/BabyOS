@@ -30,9 +30,12 @@
  */
 
 /*Includes ----------------------------------------------*/
-#include "algorithm/inc/algo_utf8_unicode.h"
+#include "inc/algo_utf8_unicode.h"
 
 #include <string.h>
+
+#if (defined(_ALGO_UNICODE_ENABLE) && (_ALGO_UNICODE_ENABLE == 1))
+
 /**
  * \addtogroup ALGORITHM
  * \{
@@ -284,5 +287,7 @@ int utf8_to_unicode(const uint8_t *utf8, uint32_t *unicode)
 /**
  * \}
  */
+
+#endif
 
 /************************ Copyright (c) 2020 Bean *****END OF FILE****/

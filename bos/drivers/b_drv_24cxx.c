@@ -55,9 +55,7 @@
  * \defgroup 24CXX_Private_Defines
  * \{
  */
-#ifndef NULL
-#define NULL ((void *)0)
-#endif
+#define DRIVER_NAME 24CXX
 /**
  * \}
  */
@@ -75,9 +73,10 @@
  * \defgroup 24CXX_Private_Variables
  * \{
  */
+bDRIVER_HALIF_TABLE(b24CXX_HalIf_t, DRIVER_NAME);
 
-const static b24CXX_HalIf_t b24CXX_HalIfTable[] = HAL_24CXX_IF;
-b24CXX_Driver_t             b24CXX_Driver[sizeof(b24CXX_HalIfTable) / sizeof(b24CXX_HalIf_t)];
+static b24CXXPrivate_t b24CXXRunInfo[bDRIVER_HALIF_NUM(b24CXX_HalIf_t, DRIVER_NAME)];
+
 /**
  * \}
  */
@@ -96,43 +95,84 @@ b24CXX_Driver_t             b24CXX_Driver[sizeof(b24CXX_HalIfTable) / sizeof(b24
  * \{
  */
 
-static int _b24CXXWrite(b24CXX_Driver_t *pdrv, uint32_t off, uint8_t *pbuf, uint16_t len)
+static int _b24CXXWrite(bDriverInterface_t *pdrv, uint32_t off, uint8_t *pbuf, uint32_t len)
 {
-    uint8_t  l_c = off % 8;
-    uint16_t i   = 0;
-    bDRV_GET_HALIF(_if, b24CXX_HalIf_t, pdrv);
+    uint32_t i = 0, l_c = 0;
+    bDRIVER_GET_HALIF(_if, b24CXX_HalIf_t, pdrv);
+    bDRIVER_GET_PRIVATE(_priv, b24CXXPrivate_t, pdrv);
+
+    l_c = _priv->page_size - off % (_priv->page_size);
     if (len <= l_c)
     {
-        bHalI2CDriver.pMemWrite(_if, off, pbuf, len);
+        bHalI2CMemWrite(_if, off, 1 + (_priv->capacity > 256), pbuf, len);
     }
     else
     {
-        bHalI2CDriver.pMemWrite(_if, off, pbuf, l_c);
+        bHalI2CMemWrite(_if, off, 1 + (_priv->capacity > 256), pbuf, l_c);
         bHalDelayMs(5);
         off += l_c;
         pbuf += l_c;
         len -= l_c;
-        for (i = 0; i < len / 8; i++)
+        for (i = 0; i < len / (_priv->page_size); i++)
         {
-            bHalI2CDriver.pMemWrite(_if, off, pbuf, 8);
+            bHalI2CMemWrite(_if, off, 1 + (_priv->capacity > 256), pbuf, _priv->page_size);
             bHalDelayMs(5);
-            off += 8;
-            pbuf += 8;
+            off += _priv->page_size;
+            pbuf += _priv->page_size;
         }
-        if ((len % 8) > 0)
+        if ((len % _priv->page_size) > 0)
         {
-            bHalI2CDriver.pMemWrite(_if, off, pbuf, (len % 8));
+            bHalI2CMemWrite(_if, off, 1 + (_priv->capacity > 256), pbuf, (len % _priv->page_size));
             bHalDelayMs(5);
         }
     }
     return len;
 }
 
-static int _b24CXXRead(b24CXX_Driver_t *pdrv, uint32_t off, uint8_t *pbuf, uint16_t len)
+static int _b24CXXRead(bDriverInterface_t *pdrv, uint32_t off, uint8_t *pbuf, uint32_t len)
 {
-    bDRV_GET_HALIF(_if, b24CXX_HalIf_t, pdrv);
-    bHalI2CDriver.pMemRead(_if, off, pbuf, len);
+    bDRIVER_GET_HALIF(_if, b24CXX_HalIf_t, pdrv);
+    bDRIVER_GET_PRIVATE(_priv, b24CXXPrivate_t, pdrv);
+    bHalI2CMemRead(_if, off, 1 + (_priv->capacity > 256), pbuf, len);
     return len;
+}
+
+static int _b24CXXCtl(bDriverInterface_t *pdrv, uint8_t cmd, void *param)
+{
+    bDRIVER_GET_PRIVATE(_priv, b24CXXPrivate_t, pdrv);
+    switch (cmd)
+    {
+        case bCMD_EE_SET_CAPACITY:
+        {
+            if (param == NULL)
+            {
+                return -1;
+            }
+            _priv->capacity = *((uint32_t *)param);
+        }
+        break;
+        case bCMD_EE_GET_CAPACITY:
+        {
+            if (param == NULL)
+            {
+                return -1;
+            }
+            *((uint32_t *)param) = _priv->capacity;
+        }
+        break;
+        case bCMD_EE_PAGE_SIZE:
+        {
+            if (param == NULL)
+            {
+                return -1;
+            }
+            _priv->page_size = *((uint32_t *)param);
+        }
+        break;
+        default:
+            break;
+    }
+    return 0;
 }
 
 /**
@@ -143,24 +183,27 @@ static int _b24CXXRead(b24CXX_Driver_t *pdrv, uint32_t off, uint8_t *pbuf, uint1
  * \addtogroup 24CXX_Exported_Functions
  * \{
  */
-int b24CXX_Init()
+int b24CXX_Init(bDriverInterface_t *pdrv)
 {
-    uint8_t i = 0, num_drv = sizeof(b24CXX_HalIfTable) / sizeof(b24CXX_HalIf_t);
-    for (i = 0; i < num_drv; i++)
-    {
-        b24CXX_Driver[i]._hal_if = (void *)&b24CXX_HalIfTable[i];
-        b24CXX_Driver[i].status  = 0;
-        b24CXX_Driver[i].close   = NULL;
-        b24CXX_Driver[i].read    = _b24CXXRead;
-        b24CXX_Driver[i].ctl     = NULL;
-        b24CXX_Driver[i].open    = NULL;
-        b24CXX_Driver[i].write   = _b24CXXWrite;
-    }
+    bDRIVER_STRUCT_INIT(pdrv, DRIVER_NAME, b24CXX_Init);
+    pdrv->read  = _b24CXXRead;
+    pdrv->write = _b24CXXWrite;
+    pdrv->ctl   = _b24CXXCtl;
+
+    b24CXXRunInfo[pdrv->drv_no].capacity  = 256;
+    b24CXXRunInfo[pdrv->drv_no].page_size = 8;
+    pdrv->_private._p                     = &b24CXXRunInfo[pdrv->drv_no];
+
     return 0;
 }
 
-bDRIVER_REG_INIT(b24CXX_Init);
-
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section driver_init
+#endif
+bDRIVER_REG_INIT(B_DRIVER_24CXX, b24CXX_Init);
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section 
+#endif
 /**
  * \}
  */

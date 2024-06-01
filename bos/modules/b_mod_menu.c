@@ -31,7 +31,7 @@
 
 /*Includes ----------------------------------------------*/
 #include "modules/inc/b_mod_menu.h"
-#if _MENU_ENABLE
+#if (defined(_MENU_ENABLE) && (_MENU_ENABLE == 1))
 
 /**
  * \addtogroup BABYOS
@@ -52,7 +52,16 @@
  * \defgroup MENU_Private_TypesDefinitions
  * \{
  */
-
+typedef struct bMenuItem
+{
+    uint32_t          id;
+    struct bMenuItem *prev;
+    struct bMenuItem *next;
+    struct bMenuItem *parent;
+    struct bMenuItem *child;
+    pCreateUI         create_ui;
+    uint8_t           visible;
+} bMenuItem_t;
 /**
  * \}
  */
@@ -61,9 +70,7 @@
  * \defgroup MENU_Private_Defines
  * \{
  */
-#ifndef NULL
-#define NULL ((void *)0)
-#endif
+
 /**
  * \}
  */

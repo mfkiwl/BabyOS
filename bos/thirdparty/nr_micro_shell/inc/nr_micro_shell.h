@@ -43,9 +43,9 @@ extern "C" {
 
 #include "../inc/nr_micro_shell_config.h"
 #include "ansi.h"
-#include "core/inc/b_section.h"
+#include "b_section.h"
 
-#if _NR_MICRO_SHELL_ENABLE
+#if (defined(_NR_MICRO_SHELL_ENABLE) && (_NR_MICRO_SHELL_ENABLE == 1))
 
 #ifndef shell_printf
 #define shell_printf(fmt, args...) printf(fmt, ##args);
@@ -84,7 +84,7 @@ typedef struct nr_shell
 
 void               _shell_init(shell_st *shell);
 void               shell_parser(shell_st *shell, char *str);
-char *             shell_cmd_complete(shell_st *shell, char *str);
+char              *shell_cmd_complete(shell_st *shell, char *str);
 void               shell_his_queue_init(shell_his_queue_st *queue);
 void               shell_his_queue_add_cmd(shell_his_queue_st *queue, char *str);
 unsigned short int shell_his_queue_search_cmd(shell_his_queue_st *queue, char *str);

@@ -40,6 +40,8 @@ extern "C" {
 
 #include "b_config.h"
 
+#if (defined(_ALGO_BASE64_ENABLE) && (_ALGO_BASE64_ENABLE == 1))
+
 /**
  * \addtogroup ALGORITHM
  * \{
@@ -68,6 +70,8 @@ uint16_t base64_decode(const char *in, uint16_t inlen, uint8_t *out);
 /**
  * \}
  */
+
+#endif
 
 #ifdef __cplusplus
 }

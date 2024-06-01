@@ -1,6 +1,6 @@
 /**
  *!
- * \file        b_mod_shell.h
+ * \file        b_mod_param.h
  * \version     v0.0.1
  * \date        2020/01/02
  * \author      Bean(notrynohigh@outlook.com)
@@ -40,7 +40,7 @@ extern "C" {
 
 #include "b_config.h"
 
-#if _PARAM_ENABLE
+#if (defined(_PARAM_ENABLE) && (_PARAM_ENABLE == 1))
 /**
  * \addtogroup BABYOS
  * \{
@@ -60,7 +60,7 @@ extern "C" {
  * \defgroup PARAM_Exported_TypesDefinitions
  * \{
  */
-typedef struct bParamStruct
+typedef struct
 {
     uint8_t size;
     char*   name;

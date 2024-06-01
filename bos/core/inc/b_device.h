@@ -62,11 +62,29 @@ extern "C" {
 
 typedef enum
 {
+    B_REG_DEV_NULL,
 #define B_DEVICE_REG(dev, driver, desc) dev,
 #include "b_device_list.h"
-    bDEV_NULL,
-    bDEV_MAX_NUM
+    B_REG_DEV_NUMBER
 } bDeviceName_t;
+
+typedef union
+{
+    uint32_t v;
+    void    *_p;
+} bDeviceMsg_t;
+
+/**
+ * \}
+ */
+
+/**
+ * \defgroup DEVICE_Exported_Definitions
+ * \{
+ */
+
+#define B_DEVICE_FUNC_NULL (-254)
+#define B_DEVICE_STAT_ERR (-255)
 
 /**
  * \}
@@ -77,12 +95,23 @@ typedef enum
  * \{
  */
 int bDeviceInit(void);
-int bDeviceOpen(uint8_t no);
-int bDeviceClose(uint8_t no);
-int bDeviceRead(uint8_t no, uint32_t offset, uint8_t *pdata, uint16_t len);
-int bDeviceWrite(uint8_t no, uint32_t offset, uint8_t *pdata, uint16_t len);
-int bDeviceCtl(uint8_t no, uint8_t cmd, void *param);
-int bDeviceISNormal(uint8_t no);
+int bDeviceReinit(uint32_t dev_no);
+int bDeviceOpen(uint32_t dev_no);
+int bDeviceClose(uint32_t dev_no);
+int bDeviceRead(uint32_t dev_no, uint32_t offset, uint8_t *pdata, uint32_t len);
+int bDeviceWrite(uint32_t dev_no, uint32_t offset, uint8_t *pdata, uint32_t len);
+int bDeviceCtl(uint32_t dev_no, uint8_t cmd, void *param);
+int bDeviceISNormal(uint32_t dev_no);
+int bDeviceModifyHalIf(uint32_t dev_no, uint32_t offset, const uint8_t *pVal, uint8_t size);
+int bDeviceReadMessage(uint32_t dev_no, bDeviceMsg_t *pmsg);
+int bDeviceWriteMessage(uint32_t dev_no, bDeviceMsg_t *pmsg);
+
+uint8_t bDeviceIsReadable(uint32_t dev_no);
+uint8_t bDeviceIsWritable(uint32_t dev_no);
+uint8_t bDeviceIsAbnormal(uint32_t dev_no);
+
+const char *bDeviceDescription(uint32_t dev_no);
+
 /**
  * \}
  */

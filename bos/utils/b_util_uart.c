@@ -28,10 +28,13 @@
  * SOFTWARE.
  *******************************************************************************
  */
-
+#if 0   //已废弃，其功能已融入 b_hal_uart
 /*Includes ----------------------------------------------*/
 #include "utils/inc/b_util_uart.h"
-#include "core/inc/b_section.h"
+
+#include <string.h>
+
+#include "b_section.h"
 #include "hal/inc/b_hal.h"
 
 /**
@@ -57,9 +60,6 @@
  * \defgroup UART_Private_Defines
  * \{
  */
-#ifndef NULL
-#define NULL ((void *)0)
-#endif
 
 /**
  * \}
@@ -78,7 +78,8 @@
  * \defgroup UART_Private_Variables
  * \{
  */
-static bUitlUartInstance_t bUitlUartHead = {.next = NULL, .prev = NULL};
+static bUitlUartInstance_t  bUitlUartHead = {.next = NULL, .prev = NULL};
+static bUitlUartInstance_t *pUtilUartBindTable[B_HAL_UART_NUMBER];
 /**
  * \}
  */
@@ -97,16 +98,16 @@ static bUitlUartInstance_t bUitlUartHead = {.next = NULL, .prev = NULL};
  * \{
  */
 
-static void _UtilUartListAdd(bUitlUartInstance_t *pInstance)
+static void _UtilUartListAdd(bUitlUartInstance_t *pinstance)
 {
     bUitlUartInstance_t *phead = &bUitlUartHead;
     for (;;)
     {
         if (phead->next == NULL)
         {
-            phead->next     = pInstance;
-            pInstance->prev = phead;
-            pInstance->next = NULL;
+            phead->next     = pinstance;
+            pinstance->prev = phead;
+            pinstance->next = NULL;
             break;
         }
         else
@@ -118,8 +119,7 @@ static void _UtilUartListAdd(bUitlUartInstance_t *pInstance)
 
 static void _bUtilUartDetectIdle()
 {
-    uint32_t             c_tick = bHalGetSysTick();
-    bUitlUartInstance_t *phead  = &bUitlUartHead;
+    bUitlUartInstance_t *phead = &bUitlUartHead;
     for (;;)
     {
         if (phead->next != NULL)
@@ -142,9 +142,15 @@ static void _bUtilUartDetectIdle()
                     {
                         if (phead->next->callback != NULL)
                         {
-                            phead->next->callback(phead->next->pbuf, phead->next->index);
-                            phead->next->index = 0;
+                            if ((phead->next->callback(phead->next->pbuf, phead->next->index,
+                                                       phead->next->cb_arg) >= 0) ||
+                                (phead->next->index == phead->next->buf_size))
+                            {
+                                memset(phead->next->pbuf, 0, phead->next->buf_size);
+                                phead->next->index = 0;
+                            }
                         }
+                        phead->next->l_tick = bHalGetSysTick();
                     }
                 }
             }
@@ -157,8 +163,13 @@ static void _bUtilUartDetectIdle()
     }
 }
 
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section bos_polling
+#endif
 BOS_REG_POLLING_FUNC(_bUtilUartDetectIdle);
-
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section 
+#endif
 /**
  * \}
  */
@@ -168,23 +179,87 @@ BOS_REG_POLLING_FUNC(_bUtilUartDetectIdle);
  * \{
  */
 
-void bUtilUartRxHandler(bUitlUartInstance_t *pInstance, uint8_t dat)
+void bUtilUartBind(uint8_t uart_no, bUitlUartInstance_t *pinstance)
 {
-    if (pInstance == NULL)
+    static uint8_t bind_init_f = 0;
+    if (bind_init_f == 0)
+    {
+        memset(pUtilUartBindTable, 0, sizeof(pUtilUartBindTable));
+        bind_init_f = 1;
+    }
+
+    if (uart_no < B_HAL_UART_NUMBER && pinstance != NULL)
+    {
+        pUtilUartBindTable[uart_no] = pinstance;
+        if (pinstance->prev == NULL)
+        {
+            _UtilUartListAdd(pinstance);
+        }
+    }
+}
+
+void bUtilUartRxHandler(bUitlUartInstance_t *pinstance, uint8_t dat)
+{
+    if (pinstance == NULL)
     {
         return;
     }
-
-    if (pInstance->prev == NULL)
+    if (pinstance->pbuf == NULL)
     {
-        _UtilUartListAdd(pInstance);
+        return;
     }
-
-    if (pInstance->index < pInstance->buf_size)
+    if (pinstance->prev == NULL)
     {
-        pInstance->pbuf[pInstance->index] = dat;
-        pInstance->index += 1;
+        _UtilUartListAdd(pinstance);
     }
+    if (pinstance->index < pinstance->buf_size)
+    {
+        pinstance->pbuf[pinstance->index] = dat;
+        pinstance->index += 1;
+    }
+}
+
+void bUtilUartRxHandler2(uint8_t uart_no, uint8_t dat)
+{
+    if (uart_no >= B_HAL_UART_NUMBER)
+    {
+        return;
+    }
+    if (pUtilUartBindTable[uart_no] == NULL)
+    {
+        return;
+    }
+    if (pUtilUartBindTable[uart_no]->pbuf == NULL)
+    {
+        return;
+    }
+    if (pUtilUartBindTable[uart_no]->index < pUtilUartBindTable[uart_no]->buf_size)
+    {
+        pUtilUartBindTable[uart_no]->pbuf[pUtilUartBindTable[uart_no]->index] = dat;
+        pUtilUartBindTable[uart_no]->index += 1;
+    }
+}
+
+uint16_t bUtilUartReceivedSize(bUitlUartInstance_t *pinstance)
+{
+    if (pinstance == NULL)
+    {
+        return 0;
+    }
+    return pinstance->index;
+}
+
+uint16_t bUtilUartReceivedSize2(uint8_t uart_no)
+{
+    if (uart_no >= B_HAL_UART_NUMBER)
+    {
+        return 0;
+    }
+    if (pUtilUartBindTable[uart_no] == NULL)
+    {
+        return 0;
+    }
+    return pUtilUartBindTable[uart_no]->index;
 }
 
 /**
@@ -198,5 +273,5 @@ void bUtilUartRxHandler(bUitlUartInstance_t *pInstance, uint8_t dat)
 /**
  * \}
  */
-
+#endif
 /************************ Copyright (c) 2020 Bean *****END OF FILE****/

@@ -60,13 +60,9 @@
  * \defgroup ILI9341_Private_Defines
  * \{
  */
-#ifndef _LCD_X_SIZE
-#define _LCD_X_SIZE 240
-#endif
 
-#ifndef _LCD_Y_SIZE
-#define _LCD_Y_SIZE 320
-#endif
+#define DRIVER_NAME ILI9341
+
 /**
  * \}
  */
@@ -84,8 +80,10 @@
  * \defgroup ILI9341_Private_Variables
  * \{
  */
-const static bILI9341_HalIf_t bILI9341_HalIf = HAL_ILI9341_IF;
-bILI9341_Driver_t             bILI9341_Driver;
+bDRIVER_HALIF_TABLE(bILI9341_HalIf_t, DRIVER_NAME);
+
+static bILI9341Private_t bILI9341RunInfo[bDRIVER_HALIF_NUM(bILI9341_HalIf_t, DRIVER_NAME)];
+
 /**
  * \}
  */
@@ -104,115 +102,275 @@ bILI9341_Driver_t             bILI9341_Driver;
  * \{
  */
 
-static void _bLcdWriteData(uint16_t dat)
+static void _bLcdWriteData(bDriverInterface_t *pdrv, uint16_t dat)
 {
-    if (bILI9341_HalIf.is_rw_addr)
+    bDRIVER_GET_HALIF(_if, bILI9341_HalIf_t, pdrv);
+    if (_if->if_type == LCD_IF_TYPE_RWADDR)
     {
-        ((bLcdRWAddress_t *)bILI9341_HalIf._if.rw_addr)->dat = dat;
+        ((bLcdRWAddress_t *)_if->_if.rw_addr)->dat = dat;
     }
-    else
+    else if (_if->if_type == LCD_IF_TYPE_IO)
     {
-        bHalGPIODriver.pGpioWritePin(bILI9341_HalIf._if._io.rs.port, bILI9341_HalIf._if._io.rs.pin, 1);
-        bHalGPIODriver.pGpioWritePin(bILI9341_HalIf._if._io.rd.port, bILI9341_HalIf._if._io.rd.pin, 1);
-        bHalGPIODriver.pGpioWritePin(bILI9341_HalIf._if._io.cs.port, bILI9341_HalIf._if._io.cs.pin, 0);
-        bHalGPIODriver.pGpioWritePort(bILI9341_HalIf._if._io.data.port, dat);
-        bHalGPIODriver.pGpioWritePin(bILI9341_HalIf._if._io.wr.port, bILI9341_HalIf._if._io.wr.pin, 0);
-        bHalGPIODriver.pGpioWritePin(bILI9341_HalIf._if._io.wr.port, bILI9341_HalIf._if._io.wr.pin, 1);
-        bHalGPIODriver.pGpioWritePin(bILI9341_HalIf._if._io.cs.port, bILI9341_HalIf._if._io.cs.pin, 1);
+        bHalGpioWritePin(_if->_if._io.rs.port, _if->_if._io.rs.pin, 1);
+        bHalGpioWritePin(_if->_if._io.rd.port, _if->_if._io.rd.pin, 1);
+        bHalGpioWritePin(_if->_if._io.cs.port, _if->_if._io.cs.pin, 0);
+        bHalGpioWritePort(_if->_if._io.data.port, dat);
+        bHalGpioWritePin(_if->_if._io.wr.port, _if->_if._io.wr.pin, 0);
+        bHalGpioWritePin(_if->_if._io.wr.port, _if->_if._io.wr.pin, 1);
+        bHalGpioWritePin(_if->_if._io.cs.port, _if->_if._io.cs.pin, 1);
+    }
+    else if (_if->if_type == LCD_IF_TYPE_SPI)
+    {
+        bHalGpioWritePin(_if->_if._spi.rs.port, _if->_if._spi.rs.pin, 1);
+        bHalGpioWritePin(_if->_if._spi._spi.cs.port, _if->_if._spi._spi.cs.pin, 0);
+        bHalSpiSend(&_if->_if._spi._spi, (uint8_t *)&dat, 1);
+        bHalGpioWritePin(_if->_if._spi._spi.cs.port, _if->_if._spi._spi.cs.pin, 1);
     }
 }
 
-static void _bLcdWriteCmd(uint16_t cmd)
+static void _bLcdWriteGRam(bDriverInterface_t *pdrv, uint16_t dat)
 {
-
-    if (bILI9341_HalIf.is_rw_addr)
+    uint8_t tmp[2];
+    bDRIVER_GET_HALIF(_if, bILI9341_HalIf_t, pdrv);
+    if (_if->if_type == LCD_IF_TYPE_RWADDR || _if->if_type == LCD_IF_TYPE_IO)
     {
-        ((bLcdRWAddress_t *)bILI9341_HalIf._if.rw_addr)->reg = cmd;
+        _bLcdWriteData(pdrv, dat);
     }
-    else
+    else if (_if->if_type == LCD_IF_TYPE_SPI)
     {
-        bHalGPIODriver.pGpioWritePin(bILI9341_HalIf._if._io.rs.port, bILI9341_HalIf._if._io.rs.pin, 0);
-        bHalGPIODriver.pGpioWritePin(bILI9341_HalIf._if._io.rd.port, bILI9341_HalIf._if._io.rd.pin, 1);
-        bHalGPIODriver.pGpioWritePin(bILI9341_HalIf._if._io.cs.port, bILI9341_HalIf._if._io.cs.pin, 0);
-        bHalGPIODriver.pGpioWritePort(bILI9341_HalIf._if._io.data.port, cmd);
-        bHalGPIODriver.pGpioWritePin(bILI9341_HalIf._if._io.wr.port, bILI9341_HalIf._if._io.wr.pin, 0);
-        bHalGPIODriver.pGpioWritePin(bILI9341_HalIf._if._io.wr.port, bILI9341_HalIf._if._io.wr.pin, 1);
-        bHalGPIODriver.pGpioWritePin(bILI9341_HalIf._if._io.cs.port, bILI9341_HalIf._if._io.cs.pin, 1);
+        tmp[0] = (uint8_t)((dat & 0xff00) >> 8);
+        tmp[1] = (uint8_t)(dat & 0x00ff);
+        bHalGpioWritePin(_if->_if._spi.rs.port, _if->_if._spi.rs.pin, 1);
+        bHalGpioWritePin(_if->_if._spi._spi.cs.port, _if->_if._spi._spi.cs.pin, 0);
+        bHalSpiSend(&_if->_if._spi._spi, tmp, 2);
+        bHalGpioWritePin(_if->_if._spi._spi.cs.port, _if->_if._spi._spi.cs.pin, 1);
     }
 }
 
-static uint16_t _bLcdReadData()
+static void _bLcdWriteCmd(bDriverInterface_t *pdrv, uint16_t cmd)
 {
-    uint16_t dat;
-
-    if (bILI9341_HalIf.is_rw_addr)
+    bDRIVER_GET_HALIF(_if, bILI9341_HalIf_t, pdrv);
+    if (_if->if_type == LCD_IF_TYPE_RWADDR)
     {
-        dat = ((bLcdRWAddress_t *)bILI9341_HalIf._if.rw_addr)->dat;
+        ((bLcdRWAddress_t *)_if->_if.rw_addr)->reg = cmd;
     }
-    else
+    else if (_if->if_type == LCD_IF_TYPE_IO)
     {
-        bHalGPIODriver.pGpioConfig(bILI9341_HalIf._if._io.data.port, bILI9341_HalIf._if._io.data.pin,
-                        B_HAL_GPIO_INPUT, B_HAL_GPIO_NOPULL);
-        bHalGPIODriver.pGpioWritePin(bILI9341_HalIf._if._io.rs.port, bILI9341_HalIf._if._io.rs.pin, 1);
-        bHalGPIODriver.pGpioWritePin(bILI9341_HalIf._if._io.rd.port, bILI9341_HalIf._if._io.rd.pin, 0);
-        bHalGPIODriver.pGpioWritePin(bILI9341_HalIf._if._io.cs.port, bILI9341_HalIf._if._io.cs.pin, 0);
-        bHalGPIODriver.pGpioWritePin(bILI9341_HalIf._if._io.rd.port, bILI9341_HalIf._if._io.rd.pin, 1);
-        dat = bHalGPIODriver.pGpioReadPort(bILI9341_HalIf._if._io.data.port);
-        bHalGPIODriver.pGpioWritePin(bILI9341_HalIf._if._io.cs.port, bILI9341_HalIf._if._io.cs.pin, 1);
-        bHalGPIODriver.pGpioConfig(bILI9341_HalIf._if._io.data.port, bILI9341_HalIf._if._io.data.pin,
-                        B_HAL_GPIO_OUTPUT, B_HAL_GPIO_NOPULL);
+        bHalGpioWritePin(_if->_if._io.rs.port, _if->_if._io.rs.pin, 0);
+        bHalGpioWritePin(_if->_if._io.rd.port, _if->_if._io.rd.pin, 1);
+        bHalGpioWritePin(_if->_if._io.cs.port, _if->_if._io.cs.pin, 0);
+        bHalGpioWritePort(_if->_if._io.data.port, cmd);
+        bHalGpioWritePin(_if->_if._io.wr.port, _if->_if._io.wr.pin, 0);
+        bHalGpioWritePin(_if->_if._io.wr.port, _if->_if._io.wr.pin, 1);
+        bHalGpioWritePin(_if->_if._io.cs.port, _if->_if._io.cs.pin, 1);
+    }
+    else if (_if->if_type == LCD_IF_TYPE_SPI)
+    {
+        bHalGpioWritePin(_if->_if._spi.rs.port, _if->_if._spi.rs.pin, 0);
+        bHalGpioWritePin(_if->_if._spi._spi.cs.port, _if->_if._spi._spi.cs.pin, 0);
+        bHalSpiSend(&_if->_if._spi._spi, (uint8_t *)&cmd, 1);
+        bHalGpioWritePin(_if->_if._spi._spi.cs.port, _if->_if._spi._spi.cs.pin, 1);
+    }
+}
+
+static uint16_t _bLcdReadData(bDriverInterface_t *pdrv)
+{
+    uint16_t dat = 0;
+    bDRIVER_GET_HALIF(_if, bILI9341_HalIf_t, pdrv);
+    if (_if->if_type == LCD_IF_TYPE_RWADDR)
+    {
+        dat = ((bLcdRWAddress_t *)_if->_if.rw_addr)->dat;
+    }
+    else if (_if->if_type == LCD_IF_TYPE_IO)
+    {
+        bHalGpioConfig(_if->_if._io.data.port, _if->_if._io.data.pin, B_HAL_GPIO_INPUT,
+                       B_HAL_GPIO_NOPULL);
+        bHalGpioWritePin(_if->_if._io.rs.port, _if->_if._io.rs.pin, 1);
+        bHalGpioWritePin(_if->_if._io.rd.port, _if->_if._io.rd.pin, 0);
+        bHalGpioWritePin(_if->_if._io.cs.port, _if->_if._io.cs.pin, 0);
+        bHalGpioWritePin(_if->_if._io.rd.port, _if->_if._io.rd.pin, 1);
+        dat = bHalGpioReadPort(_if->_if._io.data.port);
+        bHalGpioWritePin(_if->_if._io.cs.port, _if->_if._io.cs.pin, 1);
+        bHalGpioConfig(_if->_if._io.data.port, _if->_if._io.data.pin, B_HAL_GPIO_OUTPUT,
+                       B_HAL_GPIO_NOPULL);
     }
     return dat;
 }
 
-/*
-static uint16_t _bLcdReadCmd()
+static int _bILI9341CheckId(bDriverInterface_t *pdrv)
 {
-    uint16_t cmd;
-
-    if (bILI9341_HalIf.is_rw_addr)
+    uint16_t id = 0x9341;
+    bDRIVER_GET_HALIF(_if, bILI9341_HalIf_t, pdrv);
+    if (_if->if_type == LCD_IF_TYPE_IO || _if->if_type == LCD_IF_TYPE_RWADDR)
     {
-        cmd = ((bLcdRWAddress_t *)bILI9341_HalIf._if.rw_addr)->reg;
+        _bLcdWriteCmd(pdrv, 0XD3);
+        id = _bLcdReadData(pdrv);
+        id = _bLcdReadData(pdrv);
+        id = _bLcdReadData(pdrv);
+        id <<= 8;
+        id |= _bLcdReadData(pdrv);
     }
-    else
+    else if (_if->if_type == LCD_IF_TYPE_SPI)
     {
-        bHalGPIODriver.pGpioConfig(bILI9341_HalIf._if._io.data.port, bILI9341_HalIf._if._io.data.pin,
-                        B_HAL_GPIO_INPUT, B_HAL_GPIO_NOPULL);
-        bHalGPIODriver.pGpioWritePin(bILI9341_HalIf._if._io.rs.port, bILI9341_HalIf._if._io.rs.pin, 0);
-        bHalGPIODriver.pGpioWritePin(bILI9341_HalIf._if._io.rd.port, bILI9341_HalIf._if._io.rd.pin, 0);
-        bHalGPIODriver.pGpioWritePin(bILI9341_HalIf._if._io.cs.port, bILI9341_HalIf._if._io.cs.pin, 0);
-        bHalGPIODriver.pGpioWritePin(bILI9341_HalIf._if._io.rd.port, bILI9341_HalIf._if._io.rd.pin, 1);
-        cmd = bHalGPIODriver.pGpioReadPort(bILI9341_HalIf._if._io.data.port);
-        bHalGPIODriver.pGpioWritePin(bILI9341_HalIf._if._io.cs.port, bILI9341_HalIf._if._io.cs.pin, 1);
-        bHalGPIODriver.pGpioConfig(bILI9341_HalIf._if._io.data.port, bILI9341_HalIf._if._io.data.pin,
-                        B_HAL_GPIO_OUTPUT, B_HAL_GPIO_NOPULL);
     }
-    return cmd;
-}
-*/
-
-static void _bILI9341SetCursor(uint16_t Xpos, uint16_t Ypos)
-{
-    _bLcdWriteCmd(0X2A);
-    _bLcdWriteData(Xpos >> 8);
-    _bLcdWriteData(Xpos & 0XFF);
-    _bLcdWriteCmd(0X2B);
-    _bLcdWriteData(Ypos >> 8);
-    _bLcdWriteData(Ypos & 0XFF);
-    _bLcdWriteCmd(0X2C);
+    return ((id == 0x9341) ? 0 : -1);
 }
 
-static int _bILI9341Write(bILI9341_Driver_t *pdrv, uint32_t addr, uint8_t *pbuf, uint16_t len)
+static void _bILI9341SetCursor(bDriverInterface_t *pdrv, uint16_t Xpos, uint16_t Ypos)
 {
-    uint16_t     x      = addr % _LCD_X_SIZE;
-    uint16_t     y      = addr / _LCD_X_SIZE;
-    bLcdWrite_t *pcolor = (bLcdWrite_t *)pbuf;
-    if (y >= _LCD_Y_SIZE || pbuf == NULL || len < sizeof(bLcdWrite_t))
+    _bLcdWriteCmd(pdrv, 0X2A);
+    _bLcdWriteData(pdrv, Xpos >> 8);
+    _bLcdWriteData(pdrv, Xpos & 0XFF);
+    _bLcdWriteCmd(pdrv, 0X2B);
+    _bLcdWriteData(pdrv, Ypos >> 8);
+    _bLcdWriteData(pdrv, Ypos & 0XFF);
+    _bLcdWriteCmd(pdrv, 0X2C);
+}
+
+static int _bILI9341FillRect(bDriverInterface_t *pdrv, uint16_t x1, uint16_t y1, uint16_t x2,
+                             uint16_t y2, uint16_t color)
+{
+    int      i   = 0;
+    uint16_t tmp = 0;
+    bDRIVER_GET_PRIVATE(prv, bILI9341Private_t, pdrv);
+    if (x1 > x2)
+    {
+        tmp = x1;
+        x1  = x2;
+        x2  = tmp;
+    }
+    if (y1 > y2)
+    {
+        tmp = y1;
+        y1  = y2;
+        y2  = tmp;
+    }
+
+    if (x2 >= (prv->width) || y2 >= (prv->length))
     {
         return -1;
     }
-    _bILI9341SetCursor(x, y);
-    _bLcdWriteData(pcolor->color);
+
+    _bLcdWriteCmd(pdrv, 0x2a);
+    _bLcdWriteData(pdrv, x1 >> 8);
+    _bLcdWriteData(pdrv, x1);
+    _bLcdWriteData(pdrv, x2 >> 8);
+    _bLcdWriteData(pdrv, x2);
+    _bLcdWriteCmd(pdrv, 0x2b);
+    _bLcdWriteData(pdrv, y1 >> 8);
+    _bLcdWriteData(pdrv, y1);
+    _bLcdWriteData(pdrv, y2 >> 8);
+    _bLcdWriteData(pdrv, y2);
+    _bLcdWriteCmd(pdrv, 0x2C);
+
+    for (i = 0; i < ((x2 - x1 + 1) * (y2 - y1 + 1)); i++)
+    {
+        _bLcdWriteGRam(pdrv, color);
+    }
+    return 0;
+}
+
+static int _bILI9341FillBmp(bDriverInterface_t *pdrv, uint16_t x1, uint16_t y1, uint16_t x2,
+                            uint16_t y2, uint8_t *color)
+{
+    int      i   = 0;
+    uint16_t tmp = 0;
+    bDRIVER_GET_PRIVATE(prv, bILI9341Private_t, pdrv);
+    if (x1 > x2)
+    {
+        tmp = x1;
+        x1  = x2;
+        x2  = tmp;
+    }
+    if (y1 > y2)
+    {
+        tmp = y1;
+        y1  = y2;
+        y2  = tmp;
+    }
+
+    if (x2 >= (prv->width) || y2 >= (prv->length))
+    {
+        return -1;
+    }
+
+    _bLcdWriteCmd(pdrv, 0x2a);
+    _bLcdWriteData(pdrv, x1 >> 8);
+    _bLcdWriteData(pdrv, x1);
+    _bLcdWriteData(pdrv, x2 >> 8);
+    _bLcdWriteData(pdrv, x2);
+    _bLcdWriteCmd(pdrv, 0x2b);
+    _bLcdWriteData(pdrv, y1 >> 8);
+    _bLcdWriteData(pdrv, y1);
+    _bLcdWriteData(pdrv, y2 >> 8);
+    _bLcdWriteData(pdrv, y2);
+    _bLcdWriteCmd(pdrv, 0x2C);
+
+    for (i = 0; i < ((x2 - x1 + 1) * (y2 - y1 + 1)); i++)
+    {
+        _bLcdWriteGRam(pdrv, ((uint16_t *)color)[i]);
+    }
+    return 0;
+}
+
+static int _bILI9341Ctl(bDriverInterface_t *pdrv, uint8_t cmd, void *param)
+{
+    int retval = -1;
+    bDRIVER_GET_PRIVATE(prv, bILI9341Private_t, pdrv);
+    switch (cmd)
+    {
+        case bCMD_FILL_RECT:
+        {
+            bLcdRectInfo_t *pinfo = (bLcdRectInfo_t *)param;
+            if (param == NULL)
+            {
+                return -1;
+            }
+            retval =
+                _bILI9341FillRect(pdrv, pinfo->x1, pinfo->y1, pinfo->x2, pinfo->y2, pinfo->color);
+        }
+        break;
+        case bCMD_FILL_BMP:
+        {
+            bLcdBmpInfo_t *pinfo = (bLcdBmpInfo_t *)param;
+            if (param == NULL)
+            {
+                return -1;
+            }
+            retval =
+                _bILI9341FillBmp(pdrv, pinfo->x1, pinfo->y1, pinfo->x2, pinfo->y2, pinfo->color);
+        }
+        break;
+        case bCMD_SET_SIZE:
+        {
+            bLcdSize_t *pinfo = (bLcdSize_t *)param;
+            if (param == NULL || prv == NULL)
+            {
+                return -1;
+            }
+            prv->width  = pinfo->width;
+            prv->length = pinfo->length;
+            retval      = 0;
+        }
+        break;
+        default:
+            break;
+    }
+    return retval;
+}
+
+static int _bILI9341Write(bDriverInterface_t *pdrv, uint32_t addr, uint8_t *pbuf, uint32_t len)
+{
+    bDRIVER_GET_PRIVATE(prv, bILI9341Private_t, pdrv);
+    uint16_t     x      = addr % (prv->width);
+    uint16_t     y      = addr / (prv->width);
+    bLcdWrite_t *pcolor = (bLcdWrite_t *)pbuf;
+    if (y >= (prv->length) || pbuf == NULL || len < sizeof(bLcdWrite_t))
+    {
+        return -1;
+    }
+    _bILI9341SetCursor(pdrv, x, y);
+    _bLcdWriteGRam(pdrv, pcolor->color);
     return 2;
 }
 
@@ -224,124 +382,134 @@ static int _bILI9341Write(bILI9341_Driver_t *pdrv, uint32_t addr, uint8_t *pbuf,
  * \addtogroup ILI9341_Exported_Functions
  * \{
  */
-int bILI9341_Init()
+
+int bILI9341_Init(bDriverInterface_t *pdrv)
 {
-    uint16_t id;
-    _bLcdWriteCmd(0XD3);
-    id = _bLcdReadData();
-    id = _bLcdReadData();
-    id = _bLcdReadData();
-    id <<= 8;
-    id |= _bLcdReadData();
-    b_log("id:%x\r\n", id);
-    if (id != 0x9341)
+    bDRIVER_STRUCT_INIT(pdrv, DRIVER_NAME, bILI9341_Init);
+    pdrv->write       = _bILI9341Write;
+    pdrv->ctl         = _bILI9341Ctl;
+    pdrv->_private._p = &bILI9341RunInfo[pdrv->drv_no];
+
+    bILI9341RunInfo[pdrv->drv_no].width  = 240;  // default
+    bILI9341RunInfo[pdrv->drv_no].length = 320;  // default
+
+    if (((bILI9341_HalIf_t *)pdrv->hal_if)->reset.port != B_HAL_GPIO_INVALID &&
+        ((bILI9341_HalIf_t *)pdrv->hal_if)->reset.pin != B_HAL_PIN_INVALID)
     {
-        bILI9341_Driver.status = -1;
+        bHalGpioWritePin(((bILI9341_HalIf_t *)pdrv->hal_if)->reset.port,
+                         ((bILI9341_HalIf_t *)pdrv->hal_if)->reset.pin, 0);
+        bHalDelayMs(100);
+        bHalGpioWritePin(((bILI9341_HalIf_t *)pdrv->hal_if)->reset.port,
+                         ((bILI9341_HalIf_t *)pdrv->hal_if)->reset.pin, 1);
+        bHalDelayMs(100);
+    }
+
+    if (_bILI9341CheckId(pdrv) < 0)
+    {
         return -1;
     }
-    _bLcdWriteCmd(0xCF);
-    _bLcdWriteData(0x00);
-    _bLcdWriteData(0xC1);
-    _bLcdWriteData(0X30);
-    _bLcdWriteCmd(0xED);
-    _bLcdWriteData(0x64);
-    _bLcdWriteData(0x03);
-    _bLcdWriteData(0X12);
-    _bLcdWriteData(0X81);
-    _bLcdWriteCmd(0xE8);
-    _bLcdWriteData(0x85);
-    _bLcdWriteData(0x10);
-    _bLcdWriteData(0x7A);
-    _bLcdWriteCmd(0xCB);
-    _bLcdWriteData(0x39);
-    _bLcdWriteData(0x2C);
-    _bLcdWriteData(0x00);
-    _bLcdWriteData(0x34);
-    _bLcdWriteData(0x02);
-    _bLcdWriteCmd(0xF7);
-    _bLcdWriteData(0x20);
-    _bLcdWriteCmd(0xEA);
-    _bLcdWriteData(0x00);
-    _bLcdWriteData(0x00);
-    _bLcdWriteCmd(0xC0);
-    _bLcdWriteData(0x1B);
-    _bLcdWriteCmd(0xC1);
-    _bLcdWriteData(0x01);
-    _bLcdWriteCmd(0xC5);
-    _bLcdWriteData(0x30);
-    _bLcdWriteData(0x30);
-    _bLcdWriteCmd(0xC7);
-    _bLcdWriteData(0XB7);
-    _bLcdWriteCmd(0x36);
-    _bLcdWriteData(0x08);
-    _bLcdWriteCmd(0x3A);
-    _bLcdWriteData(0x55);
-    _bLcdWriteCmd(0xB1);
-    _bLcdWriteData(0x00);
-    _bLcdWriteData(0x1A);
-    _bLcdWriteCmd(0xB6);
-    _bLcdWriteData(0x0A);
-    _bLcdWriteData(0xA2);
-    _bLcdWriteCmd(0xF2);
-    _bLcdWriteData(0x00);
-    _bLcdWriteCmd(0x26);
-    _bLcdWriteData(0x01);
-    _bLcdWriteCmd(0xE0);
-    _bLcdWriteData(0x0F);
-    _bLcdWriteData(0x2A);
-    _bLcdWriteData(0x28);
-    _bLcdWriteData(0x08);
-    _bLcdWriteData(0x0E);
-    _bLcdWriteData(0x08);
-    _bLcdWriteData(0x54);
-    _bLcdWriteData(0XA9);
-    _bLcdWriteData(0x43);
-    _bLcdWriteData(0x0A);
-    _bLcdWriteData(0x0F);
-    _bLcdWriteData(0x00);
-    _bLcdWriteData(0x00);
-    _bLcdWriteData(0x00);
-    _bLcdWriteData(0x00);
-    _bLcdWriteCmd(0XE1);
-    _bLcdWriteData(0x00);
-    _bLcdWriteData(0x15);
-    _bLcdWriteData(0x17);
-    _bLcdWriteData(0x07);
-    _bLcdWriteData(0x11);
-    _bLcdWriteData(0x06);
-    _bLcdWriteData(0x2B);
-    _bLcdWriteData(0x56);
-    _bLcdWriteData(0x3C);
-    _bLcdWriteData(0x05);
-    _bLcdWriteData(0x10);
-    _bLcdWriteData(0x0F);
-    _bLcdWriteData(0x3F);
-    _bLcdWriteData(0x3F);
-    _bLcdWriteData(0x0F);
-    _bLcdWriteCmd(0x2B);
-    _bLcdWriteData(0x00);
-    _bLcdWriteData(0x00);
-    _bLcdWriteData(0x01);
-    _bLcdWriteData(0x3f);
-    _bLcdWriteCmd(0x2A);
-    _bLcdWriteData(0x00);
-    _bLcdWriteData(0x00);
-    _bLcdWriteData(0x00);
-    _bLcdWriteData(0xef);
-    _bLcdWriteCmd(0x11);
+    _bLcdWriteCmd(pdrv, 0xCF);
+    _bLcdWriteData(pdrv, 0x00);
+    _bLcdWriteData(pdrv, 0xC1);
+    _bLcdWriteData(pdrv, 0X30);
+    _bLcdWriteCmd(pdrv, 0xED);
+    _bLcdWriteData(pdrv, 0x64);
+    _bLcdWriteData(pdrv, 0x03);
+    _bLcdWriteData(pdrv, 0X12);
+    _bLcdWriteData(pdrv, 0X81);
+    _bLcdWriteCmd(pdrv, 0xE8);
+    _bLcdWriteData(pdrv, 0x85);
+    _bLcdWriteData(pdrv, 0x10);
+    _bLcdWriteData(pdrv, 0x7A);
+    _bLcdWriteCmd(pdrv, 0xCB);
+    _bLcdWriteData(pdrv, 0x39);
+    _bLcdWriteData(pdrv, 0x2C);
+    _bLcdWriteData(pdrv, 0x00);
+    _bLcdWriteData(pdrv, 0x34);
+    _bLcdWriteData(pdrv, 0x02);
+    _bLcdWriteCmd(pdrv, 0xF7);
+    _bLcdWriteData(pdrv, 0x20);
+    _bLcdWriteCmd(pdrv, 0xEA);
+    _bLcdWriteData(pdrv, 0x00);
+    _bLcdWriteData(pdrv, 0x00);
+    _bLcdWriteCmd(pdrv, 0xC0);
+    _bLcdWriteData(pdrv, 0x1B);
+    _bLcdWriteCmd(pdrv, 0xC1);
+    _bLcdWriteData(pdrv, 0x01);
+    _bLcdWriteCmd(pdrv, 0xC5);
+    _bLcdWriteData(pdrv, 0x30);
+    _bLcdWriteData(pdrv, 0x30);
+    _bLcdWriteCmd(pdrv, 0xC7);
+    _bLcdWriteData(pdrv, 0XB7);
+    _bLcdWriteCmd(pdrv, 0x36);
+    _bLcdWriteData(pdrv, 0x08);
+    _bLcdWriteCmd(pdrv, 0x3A);
+    _bLcdWriteData(pdrv, 0x55);
+    _bLcdWriteCmd(pdrv, 0xB1);
+    _bLcdWriteData(pdrv, 0x00);
+    _bLcdWriteData(pdrv, 0x1A);
+    _bLcdWriteCmd(pdrv, 0xB6);
+    _bLcdWriteData(pdrv, 0x0A);
+    _bLcdWriteData(pdrv, 0xA2);
+    _bLcdWriteCmd(pdrv, 0xF2);
+    _bLcdWriteData(pdrv, 0x00);
+    _bLcdWriteCmd(pdrv, 0x26);
+    _bLcdWriteData(pdrv, 0x01);
+    _bLcdWriteCmd(pdrv, 0xE0);
+    _bLcdWriteData(pdrv, 0x0F);
+    _bLcdWriteData(pdrv, 0x2A);
+    _bLcdWriteData(pdrv, 0x28);
+    _bLcdWriteData(pdrv, 0x08);
+    _bLcdWriteData(pdrv, 0x0E);
+    _bLcdWriteData(pdrv, 0x08);
+    _bLcdWriteData(pdrv, 0x54);
+    _bLcdWriteData(pdrv, 0XA9);
+    _bLcdWriteData(pdrv, 0x43);
+    _bLcdWriteData(pdrv, 0x0A);
+    _bLcdWriteData(pdrv, 0x0F);
+    _bLcdWriteData(pdrv, 0x00);
+    _bLcdWriteData(pdrv, 0x00);
+    _bLcdWriteData(pdrv, 0x00);
+    _bLcdWriteData(pdrv, 0x00);
+    _bLcdWriteCmd(pdrv, 0XE1);
+    _bLcdWriteData(pdrv, 0x00);
+    _bLcdWriteData(pdrv, 0x15);
+    _bLcdWriteData(pdrv, 0x17);
+    _bLcdWriteData(pdrv, 0x07);
+    _bLcdWriteData(pdrv, 0x11);
+    _bLcdWriteData(pdrv, 0x06);
+    _bLcdWriteData(pdrv, 0x2B);
+    _bLcdWriteData(pdrv, 0x56);
+    _bLcdWriteData(pdrv, 0x3C);
+    _bLcdWriteData(pdrv, 0x05);
+    _bLcdWriteData(pdrv, 0x10);
+    _bLcdWriteData(pdrv, 0x0F);
+    _bLcdWriteData(pdrv, 0x3F);
+    _bLcdWriteData(pdrv, 0x3F);
+    _bLcdWriteData(pdrv, 0x0F);
+    _bLcdWriteCmd(pdrv, 0x2B);
+    _bLcdWriteData(pdrv, 0x00);
+    _bLcdWriteData(pdrv, 0x00);
+    _bLcdWriteData(pdrv, 0x01);
+    _bLcdWriteData(pdrv, 0x3f);
+    _bLcdWriteCmd(pdrv, 0x2A);
+    _bLcdWriteData(pdrv, 0x00);
+    _bLcdWriteData(pdrv, 0x00);
+    _bLcdWriteData(pdrv, 0x00);
+    _bLcdWriteData(pdrv, 0xef);
+    _bLcdWriteCmd(pdrv, 0x11);
     bHalDelayMs(120);
-    _bLcdWriteCmd(0x29);
-    bILI9341_Driver.status = 0;
-    bILI9341_Driver.close  = NULL;
-    bILI9341_Driver.read   = NULL;
-    bILI9341_Driver.ctl    = NULL;
-    bILI9341_Driver.open   = NULL;
-    bILI9341_Driver.write  = _bILI9341Write;
+    _bLcdWriteCmd(pdrv, 0x29);
     return 0;
 }
 
-bDRIVER_REG_INIT(bILI9341_Init);
-
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section driver_init
+#endif
+bDRIVER_REG_INIT(B_DRIVER_ILI9341, bILI9341_Init);
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section 
+#endif
 /**
  * \}
  */

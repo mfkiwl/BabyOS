@@ -40,7 +40,9 @@ extern "C" {
 
 #include "b_config.h"
 
-#if _XMODEM128_ENABLE
+#if (defined(_XMODEM128_ENABLE) && (_XMODEM128_ENABLE == 1))
+
+#include "b_mod_proto_type.h"
 
 /**
  * \addtogroup BABYOS
@@ -61,29 +63,6 @@ extern "C" {
  * \defgroup XMODEM128_Exported_TypesDefinitions
  * \{
  */
-
-typedef struct
-{
-    uint8_t soh;
-    uint8_t number;
-    uint8_t xnumber;
-    uint8_t dat[128];
-    uint8_t check;
-} bXmodem128Struct_t;
-
-typedef void (*pcb_t)(uint16_t number, uint8_t *pbuf);
-typedef void (*psend)(uint8_t cmd);
-
-typedef struct
-{
-    pcb_t    cb;
-    psend    send_f;
-    uint8_t  statu;
-    uint8_t  tt_count;
-    uint8_t  next_number;
-    uint32_t frame_number;
-    uint32_t tick;
-} bXmodem128Info_t;
 
 /**
  * \}
@@ -108,11 +87,6 @@ typedef struct
  * \defgroup XMODEM128_Exported_Functions
  * \{
  */
-
-int bXmodem128Init(pcb_t fcb, psend fs);
-int bXmodem128Parse(uint8_t *pbuf, uint8_t len);
-int bXmodem128Start(void);
-int bXmodem128Stop(void);
 
 /**
  * \}

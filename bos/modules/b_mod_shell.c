@@ -33,7 +33,10 @@
 #include "modules/inc/b_mod_shell.h"
 
 #include <string.h>
-#if _NR_MICRO_SHELL_ENABLE
+
+#include "utils/inc/b_util_log.h"
+
+#if (defined(_NR_MICRO_SHELL_ENABLE) && (_NR_MICRO_SHELL_ENABLE == 1))
 /**
  * \addtogroup BABYOS
  * \{
@@ -104,12 +107,18 @@ static void _CmdBosHandler(char argc, char *argv)
     {
         if (!strcmp("-v", &argv[argv[1]]))
         {
-            b_log("Version:%d.%d.%d\r\n", FW_VERSION / 10000, (FW_VERSION % 10000) / 100, FW_VERSION % 100);
+            b_log("Version:%d.%d.%d\r\n", FW_VERSION / 10000, (FW_VERSION % 10000) / 100,
+                  FW_VERSION % 100);
         }
     }
 }
-
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section b_mod_shell
+#endif
 bSHELL_REG_INSTANCE("bos", _CmdBosHandler);
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section 
+#endif
 
 /**
  * \}

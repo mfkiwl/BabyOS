@@ -40,7 +40,9 @@ extern "C" {
 
 #include "b_config.h"
 
-#if _MODBUS_ENABLE
+#if (defined(_MODBUS_ENABLE) && (_MODBUS_ENABLE == 1))
+
+#include "b_mod_proto_type.h"
 
 /**
  * \addtogroup BABYOS
@@ -61,81 +63,27 @@ extern "C" {
  * \defgroup MODBUS_Exported_TypesDefinitions
  * \{
  */
-
-#pragma pack(1)
-
+#define COLS 2
+typedef int (*ArrayPtr)[COLS];
 typedef struct
 {
-    uint8_t  addr;
-    uint8_t  func;
-    uint16_t reg;  // Big endian
-    uint16_t num;  // Big endian
-    uint16_t crc;  // Little endian
-} bMB_RTU_ReadRegs_t;
+    uint32_t Reg_Rows;  // Modbus读写权限表中二维数组的行=从机寄存器的个数
+    uint32_t Cols;  // Modbus读写权限表中二维数组的列,第一个元素为读,第二个元素为写
+    uint16_t (*ArrayPtr)[COLS];  // 一维数组指针，指向二维数组第一行元素
+} bModbusInf_t;
 
-typedef struct
+typedef enum
 {
-    uint8_t addr;
-    uint8_t func;
-    uint8_t len;
-    uint8_t buf[1];
-} bMB_RTU_ReadRegsAck_t;
+    MODBUS_LEN_ERR           = -1,
+    MODBUS_FRAME_HEAD_ERR    = -2,
+    MODBUS_CRC_ERR           = -3,
+    MODBUS_MAX_REGNUM_ERR    = -4,  // 超过一帧能放的下寄存器数
+    MODBUS_ILLEGAL_REG_ERR   = -5,  // 操作非法寄存器
+    MODBUS_REG_OPERATION_ERR = -6,  // 无操作寄存器权限
+    MODBUS_CALLBACK_ERR      = -7,  // 回调告知错误
 
-typedef struct
-{
-    uint8_t  addr;
-    uint8_t  func;
-    uint16_t reg;  // Big endian
-    uint16_t num;  // Big endian
-    uint8_t  len;
-    uint8_t  param[1];
-} bMB_RTU_WriteRegs_t;
+} bModbusErrCode_t;
 
-typedef struct
-{
-    uint8_t  addr;
-    uint8_t  func;
-    uint16_t reg;  // Big endian
-    uint16_t num;  // Big endian
-    uint16_t crc;  // Little endian
-} bMB_RTU_WriteRegsAck_t;
-
-#pragma pack()
-
-typedef struct
-{
-    uint8_t   func;
-    uint8_t   reg_num;
-    uint16_t *reg_value;
-} bMB_ReadResult_t;
-
-typedef struct
-{
-    uint8_t  func;
-    uint16_t reg;
-    uint16_t reg_num;
-} bMB_WriteResult_t;
-
-typedef struct
-{
-    uint8_t type;  // 0: read     1:write
-    union
-    {
-        bMB_ReadResult_t  r_result;
-        bMB_WriteResult_t w_result;
-    } result;
-} bMB_SlaveDeviceData_t;
-
-typedef void (*pMB_Send_t)(uint8_t *pbuf, uint16_t len);
-typedef void (*pMB_Callback_t)(bMB_SlaveDeviceData_t *pdata);
-
-typedef struct
-{
-    pMB_Send_t     f;
-    pMB_Callback_t cb;
-} bMB_Info_t;
-
-typedef bMB_Info_t bModbusInstance_t;
 /**
  * \}
  */
@@ -144,10 +92,9 @@ typedef bMB_Info_t bModbusInstance_t;
  * \defgroup MODBUS_Exported_Defines
  * \{
  */
-
-#define bMODBUS_INSTANCE(name, pSendData, pCallback) \
-    bModbusInstance_t name = {.f = pSendData, .cb = pCallback};
-
+#define MODBUS_RTU_READ_REGS (0x3)
+#define MODBUS_RTU_WRITE_REGS (0x10)
+#define MODBUS_RTU_WRITE_REG (0x06)
 /**
  * \}
  */
@@ -165,12 +112,7 @@ typedef bMB_Info_t bModbusInstance_t;
  * \defgroup MODBUS_Exported_Functions
  * \{
  */
-///< pModbusInstance \ref  bMODBUS_INSTANCE
-int bMB_ReadRegs(bModbusInstance_t *pModbusInstance, uint8_t addr, uint8_t func, uint16_t reg,
-                 uint16_t num);
-int bMB_WriteRegs(bModbusInstance_t *pModbusInstance, uint8_t addr, uint8_t func, uint16_t reg,
-                  uint16_t num, uint16_t *reg_value);
-int bMB_FeedReceivedData(bModbusInstance_t *pModbusInstance, uint8_t *pbuf, uint16_t len);
+
 /**
  * \}
  */

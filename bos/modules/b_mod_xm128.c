@@ -32,10 +32,8 @@
 /*Includes ----------------------------------------------*/
 #include "modules/inc/b_mod_xm128.h"
 
-#include "core/inc/b_section.h"
+#if (defined(_XMODEM128_ENABLE) && (_XMODEM128_ENABLE == 1))
 
-#if _XMODEM128_ENABLE
-#include "hal/inc/b_hal.h"
 /**
  * \addtogroup BABYOS
  * \{
@@ -55,6 +53,14 @@
  * \defgroup XMODEM128_Private_TypesDefinitions
  * \{
  */
+typedef struct
+{
+    uint8_t soh;
+    uint8_t number;
+    uint8_t xnumber;
+    uint8_t dat[128];
+    uint8_t check;
+} bXmodem128Struct_t;
 
 /**
  * \}
@@ -64,9 +70,6 @@
  * \defgroup XMODEM128_Private_Defines
  * \{
  */
-#define XM_S_NULL 0
-#define XM_S_WAIT_START 1
-#define XM_S_WAIT_DATA 2
 
 /**
  * \}
@@ -85,13 +88,6 @@
  * \defgroup XMODEM128_Private_Variables
  * \{
  */
-static bXmodem128Info_t bXmodem128Info = {.cb           = NULL,
-                                          .send_f       = NULL,
-                                          .statu        = XM_S_NULL,
-                                          .tt_count     = 0,
-                                          .next_number  = 0,
-                                          .frame_number = 0,
-                                          .tick         = 0};
 
 /**
  * \}
@@ -120,55 +116,76 @@ static uint8_t _bXmodem128CalCheck(uint8_t *pbuf, uint8_t len)
     return tmp;
 }
 
-static int _bXmodem128ISValid(uint8_t *pbuf, uint8_t len)
+static int _bXmodem128Parse(void *attr, uint8_t *in, uint16_t i_len, uint8_t *out, uint16_t o_len)
 {
-    bXmodem128Struct_t *ptmp = (bXmodem128Struct_t *)pbuf;
-    uint8_t             check;
-    if (pbuf == NULL || len != sizeof(bXmodem128Struct_t))
+    int                 ret   = -1;
+    bProtocolAttr_t    *pattr = (bProtocolAttr_t *)attr;
+    bXmodem128Struct_t *phead = (bXmodem128Struct_t *)in;
+    bXYModemCbParam_t   param;
+    if (phead->soh == XMODEM128_SOH && (phead->number | phead->xnumber) == 0xff &&
+        i_len >= sizeof(bXmodem128Struct_t) &&
+        _bXmodem128CalCheck(in, sizeof(bXmodem128Struct_t) - 1) == phead->check)
     {
-        return -1;
+        ret = 0;
+    }
+    else if (phead->soh == XMODEM128_EOT)
+    {
+        ret = 1;
     }
 
-    if (ptmp->soh != XMODEM128_SOH || (ptmp->number + ptmp->xnumber) != 0xff)
+    if (ret != -1)
     {
-        return -1;
+        param.seq     = (ret == 0) ? phead->number : 0;
+        param.dat     = (ret == 0) ? phead->dat : NULL;
+        param.dat_len = (ret == 0) ? 128 : 0;
+        B_SAFE_INVOKE(pattr->callback, B_XYMODEM_DATA, &param, pattr->arg);
     }
 
-    check = _bXmodem128CalCheck(pbuf, len - 1);
-    if (check != ptmp->check)
+    if (out && o_len > 0)
     {
-        return -1;
-    }
-    return 0;
-}
-
-static void _bXmodem128Timeout()
-{
-    if (bXmodem128Info.statu == XM_S_NULL)
-    {
-        return;
-    }
-    if (bHalGetSysTick() - bXmodem128Info.tick >= MS2TICKS(1000))
-    {
-        bXmodem128Info.tick = bHalGetSysTick();
-        if (bXmodem128Info.tt_count >= 10)
+        if (ret == 0)
         {
-            bXmodem128Info.tt_count = 0;
-            bXmodem128Info.statu    = XM_S_NULL;
-            if (bXmodem128Info.cb)
-            {
-                bXmodem128Info.cb(0, NULL);
-            }
+            out[0] = XMODEM128_ACK;
+            ret    = 1;
+        }
+        else if (ret == -1)
+        {
+            out[0] = XMODEM128_NAK;
+            ret    = 1;
         }
         else
         {
-            bXmodem128Info.send_f(XMODEM128_NAK);
-            bXmodem128Info.tt_count += 1;
+            ret = 0;
         }
     }
+    else
+    {
+        ret = 0;
+    }
+
+    return ret;
 }
 
-BOS_REG_POLLING_FUNC(_bXmodem128Timeout);
+static int _bXmodem128Package(void *attr, bProtoCmd_t cmd, uint8_t *buf, uint16_t buf_len)
+{
+    int ret = -1;
+    if (buf == NULL || buf_len == 0)
+    {
+        return -1;
+    }
+
+    if (cmd == B_XYMODEM_CMD_START)
+    {
+        buf[0] = XMODEM128_NAK;
+        ret    = 1;
+    }
+    if (cmd == B_XYMODEM_CMD_STOP)
+    {
+        buf[0] = XMODEM128_CAN;
+        ret    = 1;
+    }
+    return ret;
+}
 
 /**
  * \}
@@ -178,106 +195,13 @@ BOS_REG_POLLING_FUNC(_bXmodem128Timeout);
  * \addtogroup XMODEM128_Exported_Functions
  * \{
  */
-
-int bXmodem128Init(pcb_t fcb, psend fs)
-{
-    if (fcb == NULL || fs == NULL)
-    {
-        return -1;
-    }
-    bXmodem128Info.cb     = fcb;
-    bXmodem128Info.send_f = fs;
-    bXmodem128Info.statu  = XM_S_NULL;
-    return 0;
-}
-
-int bXmodem128Start()
-{
-    if (bXmodem128Info.send_f == NULL)
-    {
-        return -1;
-    }
-    if (bXmodem128Info.statu == XM_S_NULL)
-    {
-        bXmodem128Info.send_f(XMODEM128_NAK);
-        bXmodem128Info.tick         = bHalGetSysTick();
-        bXmodem128Info.next_number  = 0;
-        bXmodem128Info.frame_number = 0;
-        bXmodem128Info.statu        = XM_S_WAIT_START;
-    }
-    return 0;
-}
-
-int bXmodem128Stop()
-{
-    if (bXmodem128Info.send_f == NULL)
-    {
-        return -1;
-    }
-    if (bXmodem128Info.statu != XM_S_NULL)
-    {
-        bXmodem128Info.send_f(XMODEM128_CAN);
-        bXmodem128Info.statu = XM_S_NULL;
-    }
-    return 0;
-}
-
-int bXmodem128Parse(uint8_t *pbuf, uint8_t len)
-{
-    bXmodem128Struct_t *pxm = (bXmodem128Struct_t *)pbuf;
-    if (pbuf == NULL || bXmodem128Info.cb == NULL || bXmodem128Info.send_f == NULL ||
-        bXmodem128Info.statu == XM_S_NULL)
-    {
-        return -1;
-    }
-    bXmodem128Info.tick     = bHalGetSysTick();
-    bXmodem128Info.tt_count = 0;
-
-    if (bXmodem128Info.statu == XM_S_WAIT_START)
-    {
-        if (_bXmodem128ISValid(pbuf, len) == 0)
-        {
-            if (pxm->number == 1)
-            {
-                bXmodem128Info.statu        = XM_S_WAIT_DATA;
-                bXmodem128Info.next_number  = 1;
-                bXmodem128Info.frame_number = 0;
-            }
-        }
-    }
-
-    if (bXmodem128Info.statu == XM_S_WAIT_DATA)
-    {
-        if (_bXmodem128ISValid(pbuf, len) == 0)
-        {
-            if (pxm->number == bXmodem128Info.next_number)
-            {
-                bXmodem128Info.cb(bXmodem128Info.frame_number, pxm->dat);
-                bXmodem128Info.next_number += 1;
-                bXmodem128Info.frame_number += 1;
-                bXmodem128Info.send_f(XMODEM128_ACK);
-            }
-            else if (pxm->number > bXmodem128Info.next_number)
-            {
-                bXmodem128Info.cb(0, NULL);
-                bXmodem128Info.statu = XM_S_NULL;
-                bXmodem128Info.send_f(XMODEM128_CAN);
-            }
-            else
-            {
-                bXmodem128Info.send_f(XMODEM128_ACK);
-            }
-        }
-        else if (len == 1 && *pbuf == XMODEM128_EOT)
-        {
-            bXmodem128Info.cb(bXmodem128Info.frame_number, NULL);
-            bXmodem128Info.statu = XM_S_NULL;
-            bXmodem128Info.send_f(XMODEM128_ACK);
-        }
-    }
-    return 0;
-}
-
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section b_srv_protocol
+#endif
+bPROTOCOL_REG_INSTANCE("xmodem128", _bXmodem128Parse, _bXmodem128Package);
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section
+#endif
 /**
  * \}
  */

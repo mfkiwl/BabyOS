@@ -40,7 +40,7 @@ extern "C" {
 
 #include "b_config.h"
 
-#if _ADCHUB_ENABLE
+#if (defined(_ADCHUB_ENABLE) && (_ADCHUB_ENABLE == 1))
 /**
  * \addtogroup BABYOS
  * \{
@@ -65,7 +65,7 @@ typedef void (*pAdchubCb_t)(uint32_t ad_val, uint32_t arg);
 
 typedef struct _AdcInfo
 {
-    uint8_t          srq;
+    uint8_t          seq;
     uint8_t          filter;
     uint8_t          flag;
     uint8_t          index;
@@ -87,9 +87,9 @@ typedef bAdcInfo_t bAdcInstance_t;
  * \{
  */
 
-#define bADC_INSTANCE(name, ad_srq, filter_en, cb, cb_arg) \
+#define bADC_INSTANCE(name, ad_seq, filter_en, cb, cb_arg) \
     bAdcInstance_t name = {                                \
-        .srq      = ad_srq,                                \
+        .seq      = ad_seq,                                \
         .filter   = filter_en,                             \
         .callback = cb,                                    \
         .arg      = cb_arg,                                \
@@ -104,8 +104,8 @@ typedef bAdcInfo_t bAdcInstance_t;
  * \{
  */
 
-int bAdchubRegist(bAdcInstance_t *pInstance);
-int bAdchubFeedValue(uint8_t ad_srq, uint32_t ad_val);
+int bAdchubRegist(bAdcInstance_t *pinstance);
+int bAdchubFeedValue(uint8_t ad_seq, uint32_t ad_val);
 
 /**
  * \}

@@ -57,27 +57,8 @@ extern "C" {
  * \defgroup FM25CL_Exported_TypesDefinitions
  * \{
  */
-
+//<HALIF 1 SPI
 typedef bHalSPIIf_t bFM25CL_HalIf_t;
-
-typedef bDriverInterface_t bFM25CL_Driver_t;
-
-/**
- * \}
- */
-
-/**
- * \defgroup FM25CL_Exported_Defines
- * \{
- */
-
-#define SFC_WREN 0x06   // Set write enable latch
-#define SFC_WRDI 0x04   // Write disable
-#define SFC_RDSR 0x05   // Read Status Register
-#define SFC_WRSR 0x01   // Write Status Register
-#define SFC_READ 0x03   // Read memory data
-#define SFC_WRITE 0x02  // Write memory data
-
 /**
  * \}
  */

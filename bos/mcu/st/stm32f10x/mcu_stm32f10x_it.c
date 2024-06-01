@@ -33,23 +33,18 @@
 #include "b_config.h"
 #include "hal/inc/b_hal_it.h"
 
-#if (_MCU_PLATFORM == 1001 || _MCU_PLATFORM == 1002 || _MCU_PLATFORM == 1003 || \
-     _MCU_PLATFORM == 1004)
+#if (defined(STM32F10X_LD) || defined(STM32F10X_MD) || defined(STM32F10X_HD) || \
+     defined(STM32F10X_CL))
 
-static void _IntEnable()
+void bMcuIntEnable()
 {
     ;
 }
 
-static void _IntDisable()
+void bMcuIntDisable()
 {
     ;
 }
-
-bHalITDriver_t bHalITDriver = {
-    .pIntEnable  = _IntEnable,
-    .pIntDisable = _IntDisable,
-};
 
 #endif
 

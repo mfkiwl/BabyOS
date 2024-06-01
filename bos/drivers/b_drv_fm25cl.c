@@ -60,7 +60,14 @@
  * \defgroup FM25CL_Private_Defines
  * \{
  */
+#define DRIVER_NAME FM25CL
 
+#define SFC_WREN 0x06   // Set write enable latch
+#define SFC_WRDI 0x04   // Write disable
+#define SFC_RDSR 0x05   // Read Status Register
+#define SFC_WRSR 0x01   // Write Status Register
+#define SFC_READ 0x03   // Read memory data
+#define SFC_WRITE 0x02  // Write memory data
 /**
  * \}
  */
@@ -78,8 +85,7 @@
  * \defgroup FM25CL_Private_Variables
  * \{
  */
-static const bFM25CL_HalIf_t bFM25CL_HalIfTable[] = HAL_FM25CL_IF;
-bFM25CL_Driver_t             bFM25CL_Driver[sizeof(bFM25CL_HalIfTable) / sizeof(bFM25CL_HalIf_t)];
+bDRIVER_HALIF_TABLE(bFM25CL_HalIf_t, DRIVER_NAME);
 /**
  * \}
  */
@@ -101,51 +107,51 @@ bFM25CL_Driver_t             bFM25CL_Driver[sizeof(bFM25CL_HalIfTable) / sizeof(
 static void _FM25_WR_Enable(bFM25CL_HalIf_t *_if)
 {
     uint8_t cmd = SFC_WREN;
-    bHalGPIODriver.pGpioWritePin(_if->cs.port, _if->cs.pin, 0);
-    bHalSPIDriver.pSend(_if, &cmd, 1);
-    bHalGPIODriver.pGpioWritePin(_if->cs.port, _if->cs.pin, 1);
+    bHalGpioWritePin(_if->cs.port, _if->cs.pin, 0);
+    bHalSpiSend(_if, &cmd, 1);
+    bHalGpioWritePin(_if->cs.port, _if->cs.pin, 1);
 }
 
 static void _FM25_WR_Lock(bFM25CL_HalIf_t *_if)
 {
     uint8_t cmd = SFC_WRDI;
-    bHalGPIODriver.pGpioWritePin(_if->cs.port, _if->cs.pin, 0);
-    bHalSPIDriver.pSend(_if, &cmd, 1);
-    bHalGPIODriver.pGpioWritePin(_if->cs.port, _if->cs.pin, 1);
+    bHalGpioWritePin(_if->cs.port, _if->cs.pin, 0);
+    bHalSpiSend(_if, &cmd, 1);
+    bHalGpioWritePin(_if->cs.port, _if->cs.pin, 1);
 }
 
 /**************************************************************************************************driver
  * interface*****/
 
-static int _FM25_ReadBuff(bFM25CL_Driver_t *pdrv, uint32_t addr, uint8_t *pDat, uint16_t len)
+static int _FM25_ReadBuff(bDriverInterface_t *pdrv, uint32_t addr, uint8_t *pDat, uint32_t len)
 {
     uint8_t cmd[3];
-    bDRV_GET_HALIF(_if, bFM25CL_HalIf_t, pdrv);
+    bDRIVER_GET_HALIF(_if, bFM25CL_HalIf_t, pdrv);
 
     cmd[0] = SFC_READ;
     cmd[1] = (uint8_t)(addr >> 8);
     cmd[2] = (uint8_t)(addr >> 0);
 
-    bHalGPIODriver.pGpioWritePin(_if->cs.port, _if->cs.pin, 0);
-    bHalSPIDriver.pSend(_if, cmd, 3);
-    bHalSPIDriver.pReceive(_if, pDat, len);
-    bHalGPIODriver.pGpioWritePin(_if->cs.port, _if->cs.pin, 1);
+    bHalGpioWritePin(_if->cs.port, _if->cs.pin, 0);
+    bHalSpiSend(_if, cmd, 3);
+    bHalSpiReceive(_if, pDat, len);
+    bHalGpioWritePin(_if->cs.port, _if->cs.pin, 1);
     return len;
 }
 
-static int _FM25_WritBuff(bFM25CL_Driver_t *pdrv, uint32_t addr, uint8_t *pdat, uint16_t len)
+static int _FM25_WritBuff(bDriverInterface_t *pdrv, uint32_t addr, uint8_t *pdat, uint32_t len)
 {
     uint8_t cmd[3];
-    bDRV_GET_HALIF(_if, bFM25CL_HalIf_t, pdrv);
+    bDRIVER_GET_HALIF(_if, bFM25CL_HalIf_t, pdrv);
     _FM25_WR_Enable(_if);
     //-----------------------------------------------------------
     cmd[0] = SFC_WRITE;
     cmd[1] = (uint8_t)(addr >> 8);
     cmd[2] = (uint8_t)(addr >> 0);
-    bHalGPIODriver.pGpioWritePin(_if->cs.port, _if->cs.pin, 0);
-    bHalSPIDriver.pSend(_if, cmd, 3);
-    bHalSPIDriver.pSend(_if, pdat, len);
-    bHalGPIODriver.pGpioWritePin(_if->cs.port, _if->cs.pin, 1);
+    bHalGpioWritePin(_if->cs.port, _if->cs.pin, 0);
+    bHalSpiSend(_if, cmd, 3);
+    bHalSpiSend(_if, pdat, len);
+    bHalGpioWritePin(_if->cs.port, _if->cs.pin, 1);
     //-----------------------------------------------------------
     _FM25_WR_Lock(_if);
     return len;
@@ -159,22 +165,21 @@ static int _FM25_WritBuff(bFM25CL_Driver_t *pdrv, uint32_t addr, uint8_t *pdat, 
  * \addtogroup FM25CL_Exported_Functions
  * \{
  */
-int bFM25CL_Init()
+int bFM25CL_Init(bDriverInterface_t *pdrv)
 {
-    uint8_t i = 0, num_drv = (sizeof(bFM25CL_HalIfTable) / sizeof(bFM25CL_HalIf_t));
-    for (i = 0; i < num_drv; i++)
-    {
-        bFM25CL_Driver[i]._hal_if = (void *)&bFM25CL_HalIfTable[i];
-        bFM25CL_Driver[i].status  = 0;
-        bFM25CL_Driver[i].close   = NULL;
-        bFM25CL_Driver[i].read    = _FM25_ReadBuff;
-        bFM25CL_Driver[i].ctl     = NULL;
-        bFM25CL_Driver[i].open    = NULL;
-        bFM25CL_Driver[i].write   = _FM25_WritBuff;
-    }
+    bDRIVER_STRUCT_INIT(pdrv, DRIVER_NAME, bFM25CL_Init);
+    pdrv->read  = _FM25_ReadBuff;
+    pdrv->write = _FM25_WritBuff;
     return 0;
 }
 
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section driver_init
+#endif
+bDRIVER_REG_INIT(B_DRIVER_FM25CL, bFM25CL_Init);
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section 
+#endif
 /**
  * \}
  */

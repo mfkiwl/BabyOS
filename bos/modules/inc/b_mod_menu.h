@@ -40,7 +40,7 @@ extern "C" {
 
 #include "b_config.h"
 
-#if _MENU_ENABLE
+#if (defined(_MENU_ENABLE) && (_MENU_ENABLE == 1))
 /**
  * \addtogroup BABYOS
  * \{
@@ -62,17 +62,6 @@ extern "C" {
  */
 
 typedef void (*pCreateUI)(uint32_t pre_id);
-
-typedef struct bMenuItem
-{
-    uint32_t          id;
-    struct bMenuItem *prev;
-    struct bMenuItem *next;
-    struct bMenuItem *parent;
-    struct bMenuItem *child;
-    pCreateUI         create_ui;
-    uint8_t           visible;
-} bMenuItem_t;
 
 /**
  * \}

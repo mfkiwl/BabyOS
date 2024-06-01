@@ -1,8 +1,8 @@
 /**
  *!
  * \file        b_mod_kv.h
- * \version     v0.0.2
- * \date        2020/04/09
+ * \version     v0.0.3
+ * \date        2022/11/13
  * \author      Bean(notrynohigh@outlook.com)
  *******************************************************************************
  * @attention
@@ -40,7 +40,7 @@ extern "C" {
 
 #include "b_config.h"
 
-#if _KV_ENABLE
+#if (defined(_KV_ENABLE) && (_KV_ENABLE == 1))
 
 /**
  * \addtogroup BABYOS
@@ -58,34 +58,22 @@ extern "C" {
  */
 
 /**
- * \defgroup KV_Exported_TypesDefinitions
+ * \defgroup KV_Exported_Typedefines
  * \{
  */
 typedef struct
 {
-    uint32_t id;
-    uint32_t address;
-    uint32_t len;
-    uint32_t real_len;
-    uint32_t statu;
-} bKV_Index_t;
+    uint8_t        init_f;
+    const uint32_t dev;
+    const uint32_t address;
+    const uint32_t total_size;
+    const uint32_t erase_size;
+    int32_t        write_index;
+    uint32_t       write_offset;
+    uint32_t       empty_count;
+} bKVStruct_t;
 
-typedef struct
-{
-    uint8_t  status;
-    uint32_t index;
-    int      dev_no;
-    uint32_t str_address;
-    uint32_t ts_address;
-    uint32_t te_address;
-    uint32_t t_index;
-    uint32_t t_max;
-    uint32_t e_size;
-    uint32_t ds_address;
-    uint32_t de_address;
-    uint32_t d_size;
-    uint32_t d_index;
-} bKV_Info_t;
+typedef bKVStruct_t bKVInstance_t;
 
 /**
  * \}
@@ -95,19 +83,13 @@ typedef struct
  * \defgroup KV_Exported_Defines
  * \{
  */
-#define bKV_IDLE 0
-#define bKV_BUSY 1
-#define bKV_ERROR 2
 
-#define bKV_SECTOR_T1 0X01
-#define bKV_SECTOR_T2 0X02
-#define bKV_SECTOR_D1 0X04
-#define bKV_SECTOR_D2 0X08
-#define bKV_SECTOR_ALL 0X0F
-
-#define bKV_HEAD_STR "B_KV"
-
-#define bKV_ALIGN_4BYTES(n) (((n) + 3) / 4 * 4)
+/**
+ * \brief 定义实例，如果存储器不需要擦除，则e_size为0
+ */
+#define bKV_INSTANCE(name, dev_no, addr, size, e_size) \
+    bKVInstance_t name = {                             \
+        .init_f = 0, .dev = dev_no, .address = addr, .total_size = size, .erase_size = e_size};
 
 /**
  * \}
@@ -117,11 +99,12 @@ typedef struct
  * \defgroup KV_Exported_Functions
  * \{
  */
-
-int bKV_Init(int dev_no, uint32_t s_addr, uint32_t size, uint32_t e_size);
-int bKV_Set(const char *key, uint8_t *pvalue, uint16_t len);
-int bKV_Get(const char *key, uint8_t *pvalue);
-int bKV_Delete(const char *key);
+int bKVInit(bKVInstance_t *pinstance);
+int bKVGetValue(bKVInstance_t *pinstance, const char *key, uint8_t *pbuf, uint32_t len,
+                uint32_t *prlen);
+int bKVSetValue(bKVInstance_t *pinstance, const char *key, const uint8_t *pbuf, uint32_t len);
+int bKVDeleteValue(bKVInstance_t *pinstance, const char *key);
+int bKVGetValueLength(bKVInstance_t *pinstance, const char *key);
 /**
  * \}
  */

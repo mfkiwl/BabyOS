@@ -37,7 +37,6 @@ extern "C" {
 
 /*Includes ----------------------------------------------*/
 #include "drivers/inc/b_driver.h"
-
 /**
  * \addtogroup B_DRIVER
  * \{
@@ -52,7 +51,7 @@ extern "C" {
  * \defgroup LIS3DH_Exported_TypesDefinitions
  * \{
  */
-
+//<HALIF 2 SPI_I2C
 typedef struct
 {
     union
@@ -60,112 +59,9 @@ typedef struct
         bHalI2CIf_t _i2c;
         bHalSPIIf_t _spi;
     } _if;
-    uint8_t is_spi;
+    uint8_t    is_spi;
+    bHalItIf_t it[2];
 } bLIS3DH_HalIf_t;
-
-typedef bDriverInterface_t bLIS3DH_Driver_t;
-
-typedef struct
-{
-    uint8_t not_used_01 : 7;
-    uint8_t sdo_pu_disc : 1;
-} bLis3dhCtrlReg0_t;
-
-typedef struct
-{
-    uint8_t xen : 1;
-    uint8_t yen : 1;
-    uint8_t zen : 1;
-    uint8_t lpen : 1;
-    uint8_t odr : 4;
-} bLis3dhCtrlReg1_t;
-
-typedef struct
-{
-    uint8_t hp : 3; /* HPCLICK + HP_IA2 + HP_IA1 -> HP */
-    uint8_t fds : 1;
-    uint8_t hpcf : 2;
-    uint8_t hpm : 2;
-} bLis3dhCtrlReg2_t;
-
-typedef struct
-{
-    uint8_t not_used_01 : 1;
-    uint8_t i1_overrun : 1;
-    uint8_t i1_wtm : 1;
-    uint8_t not_used_02 : 1;
-    uint8_t i1_zyxda : 1;
-    uint8_t i1_ia2 : 1;
-    uint8_t i1_ia1 : 1;
-    uint8_t i1_click : 1;
-} bLis3dhCtrlReg3_t;
-
-typedef enum
-{
-    LIS3DH_INT_CLICK   = 0x80,
-    LIS3DH_INT_IA1     = 0x40,
-    LIS3DH_INT_IA2     = 0x20,
-    LIS3DH_INT_ZYXDA   = 0x10,
-    LIS3DH_INT_321DA   = 0x08,
-    LIS3DH_INT_WTM     = 0x04,
-    LIS3DH_INT_OVERRUN = 0x02
-} bLis3dhIntCfg_t;
-
-typedef struct
-{
-    uint8_t sim : 1;
-    uint8_t st : 2;
-    uint8_t hr : 1;
-    uint8_t fs : 2;
-    uint8_t ble : 1;
-    uint8_t bdu : 1;
-} bLis3dhCtrlReg4_t;
-
-typedef struct
-{
-    uint8_t d4d_int2 : 1;
-    uint8_t lir_int2 : 1;
-    uint8_t d4d_int1 : 1;
-    uint8_t lir_int1 : 1;
-    uint8_t not_used_01 : 2;
-    uint8_t fifo_en : 1;
-    uint8_t boot : 1;
-} bLis3dhCtrlReg5_t;
-
-typedef struct
-{
-    uint8_t not_used_01 : 1;
-    uint8_t int_polarity : 1;
-    uint8_t not_used_02 : 1;
-    uint8_t i2_act : 1;
-    uint8_t i2_boot : 1;
-    uint8_t i2_ia2 : 1;
-    uint8_t i2_ia1 : 1;
-    uint8_t i2_click : 1;
-} bLis3dhCtrlReg6_t;
-
-typedef struct
-{
-    uint8_t fth : 5;
-    uint8_t tr : 1;
-    uint8_t fm : 2;
-} bLis3dhFifoCtrlReg_t;
-
-typedef struct
-{
-    uint8_t fss : 5;
-    uint8_t empty : 1;
-    uint8_t ovrn_fifo : 1;
-    uint8_t wtm : 1;
-} bLis3dhFifoSrcReg_t;
-
-typedef enum
-{
-    LIS3DH_BYPASS_MODE         = 0,
-    LIS3DH_FIFO_MODE           = 1,
-    LIS3DH_DYNAMIC_STREAM_MODE = 2,
-    LIS3DH_STREAM_TO_FIFO_MODE = 3,
-} bLis3dhFifoMode_t;
 
 typedef enum
 {
@@ -181,93 +77,41 @@ typedef enum
     LIS3DH_ODR_5kHz376_LP_1kHz344_NM_HP = 0x09,
 } bLis3dhODR_t;
 
-#define HZ2ODR(hz) \
-    ((hz == 1) ? 1 : ((hz == 10) ? 2 : ((hz <= 400) ? (2 + (hz / 25)) : ((hz == 1000) ? 8 : 9))))
-#define G2FS(g) ((g == 2) ? 0 : ((g == 4) ? 1 : ((g == 8) ? 2 : 3)))
-
 typedef enum
 {
-    LIS3DH_2g  = 0,
-    LIS3DH_4g  = 1,
-    LIS3DH_8g  = 2,
-    LIS3DH_16g = 3,
+    LIS3DH_FS_2G  = 0,
+    LIS3DH_FS_4G  = 1,
+    LIS3DH_FS_8G  = 2,
+    LIS3DH_FS_16G = 3,
 } bLis3dhFS_t;
 
 typedef enum
 {
-    LIS3DH_HR_12bit = 0,  // High-resolution
-    LIS3DH_NM_10bit = 1,  // Normal
-    LIS3DH_LP_8bit  = 2,  // Low power
-} bLis3dhOpMode_t;
+    LIS3DH_HR_12BIT = 0,
+    LIS3DH_NM_10BIT = 1,
+    LIS3DH_LP_8BIT  = 2,
+} bLis3dhOptMode_t;
+
+typedef enum
+{
+    LIS3DH_BYPASS_MODE         = 0,
+    LIS3DH_FIFO_MODE           = 1,
+    LIS3DH_DYNAMIC_STREAM_MODE = 2,
+    LIS3DH_STREAM_TO_FIFO_MODE = 3,
+} bLis3dhFifoMode_t;
 
 typedef struct
 {
-    uint8_t           fifo_enable;  // 0:disable   1:enable
-    uint8_t           fth;          // Set FIFO watermark 0 <= fth <= 31
-    bLis3dhODR_t      odr;          // Output data rates \ref bLis3dhODR_t
-    bLis3dhFS_t       fs;           // Full scale \ref bLis3dhFS_t
-    bLis3dhOpMode_t   op_mode;      // Operating mode \ref bLis3dhOpMode_t
-    bLis3dhFifoMode_t fifo_mode;    // FIFO Mode \ref bLis3dhFifoMode_t
-} bLis3dhConfig_t;
-
-/**
- * \}
- */
-
-/**
- * \defgroup LIS3DH_Exported_Defines
- * \{
- */
-/** Device Identification (Who am I) **/
-#define LIS3DH_ID 0x33U
-
-#define LIS3DH_OUT_ADC1_L 0x08U
-#define LIS3DH_OUT_ADC1_H 0x09U
-#define LIS3DH_OUT_ADC2_L 0x0AU
-#define LIS3DH_OUT_ADC2_H 0x0BU
-#define LIS3DH_OUT_ADC3_L 0x0CU
-#define LIS3DH_OUT_ADC3_H 0x0DU
-#define LIS3DH_WHO_AM_I 0x0FU
-#define LIS3DH_CTRL_REG0 0x1EU
-#define LIS3DH_TEMP_CFG_REG 0x1FU
-#define LIS3DH_CTRL_REG1 0x20U
-#define LIS3DH_CTRL_REG2 0x21U
-#define LIS3DH_CTRL_REG3 0x22U
-#define LIS3DH_CTRL_REG4 0x23U
-#define LIS3DH_CTRL_REG5 0x24U
-#define LIS3DH_CTRL_REG6 0x25U
-#define LIS3DH_REFERENCE 0x26U
-#define LIS3DH_STATUS_REG 0x27U
-#define LIS3DH_OUT_X_L 0x28U
-#define LIS3DH_OUT_X_H 0x29U
-#define LIS3DH_OUT_Y_L 0x2AU
-#define LIS3DH_OUT_Y_H 0x2BU
-#define LIS3DH_OUT_Z_L 0x2CU
-#define LIS3DH_OUT_Z_H 0x2DU
-#define LIS3DH_FIFO_CTRL_REG 0x2EU
-#define LIS3DH_FIFO_SRC_REG 0x2FU
-#define LIS3DH_INT1_CFG 0x30U
-#define LIS3DH_INT1_SRC 0x31U
-#define LIS3DH_INT1_THS 0x32U
-#define LIS3DH_INT1_DURATION 0x33U
-#define LIS3DH_INT2_CFG 0x34U
-#define LIS3DH_INT2_SRC 0x35U
-#define LIS3DH_INT2_THS 0x36U
-#define LIS3DH_INT2_DURATION 0x37U
-#define LIS3DH_CLICK_CFG 0x38U
-#define LIS3DH_CLICK_SRC 0x39U
-#define LIS3DH_CLICK_THS 0x3AU
-#define LIS3DH_TIME_LIMIT 0x3BU
-#define LIS3DH_TIME_LATENCY 0x3CU
-#define LIS3DH_TIME_WINDOW 0x3DU
-#define LIS3DH_ACT_THS 0x3EU
-#define LIS3DH_ACT_DUR 0x3FU
-
-#define LIS3DH_DEFAULT_CONFIG                                                 \
-    {                                                                         \
-        .fifo_enable = 1, .fth = 12, .odr = LIS3DH_ODR_25Hz, .fs = LIS3DH_2g, \
-        .op_mode = LIS3DH_LP_8bit, .fifo_mode = LIS3DH_DYNAMIC_STREAM_MODE    \
-    }
+    bLis3dhODR_t      odr;
+    bLis3dhFS_t       fs;
+    bLis3dhOptMode_t  opmode;
+    uint8_t           fifo_en;
+    uint8_t           watermark;
+    uint8_t           fifo_intx;
+    bLis3dhFifoMode_t fm;
+    uint8_t           int_polarity;
+    bGsensor3Axis_t   data[32];
+} bList3dhPrivate_t;
 
 /**
  * \}

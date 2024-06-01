@@ -1,0 +1,53 @@
+#服务配置
+menu "Services Configuration"
+
+config _BOS_SERVICES_ENABLE
+    bool "Services Enable/Disable"
+    default y
+
+config _PROTOCOL_SERVICE_ENABLE
+    bool "Protocol Service Enable/Disable"
+    default n
+    depends on _BOS_SERVICES_ENABLE
+
+config _TCPIP_SERVICE_ENABLE
+    bool "TCPIP Service Enable/Disable"
+    default n
+    depends on _BOS_SERVICES_ENABLE 
+    select _HTTP_PARSER_ENABLE
+    select _MEMP_ENABLE
+
+config _NTP_SERVER_1
+    string "ntp server 1"
+    default "ntp1.aliyun.com"
+    depends on _TCPIP_SERVICE_ENABLE
+
+config _NTP_SERVER_2
+    string "ntp server 2"
+    default "ntp2.aliyun.com"
+    depends on _TCPIP_SERVICE_ENABLE    
+
+config _NTP_SERVER_3
+    string "ntp server 3"
+    default "ntp3.aliyun.com"
+    depends on _TCPIP_SERVICE_ENABLE    
+
+config _HTTP_HOST_LEN_MAX
+    int "The maximum length of a URL host"
+    default 64
+    depends on _TCPIP_SERVICE_ENABLE 
+
+config _HTTP_PATH_LEN_MAX
+    int "The maximum length of a URL path"
+    default 128
+    depends on _TCPIP_SERVICE_ENABLE
+
+
+config _OTA_SERVICE_ENABLE
+    bool "OTA Service Enable/Disable"
+    default n
+    depends on _BOS_SERVICES_ENABLE 
+    select _PROTOCOL_SERVICE_ENABLE
+    select _IAP_ENABLE
+
+endmenu

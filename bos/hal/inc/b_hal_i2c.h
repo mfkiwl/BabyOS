@@ -74,29 +74,34 @@ typedef struct
         {
             bHalGPIOInstance_t clk;
             bHalGPIOInstance_t sda;
+            uint32_t           frq;
         } simulating_i2c;
     } _if;
-} const bHalI2CIf_t;
-
-typedef struct
-{
-    void (*pWriteByte)(bHalI2CIf_t *i2c_if, uint8_t dat);
-    uint8_t (*pReadByte)(bHalI2CIf_t *i2c_if);
-    int (*pMemWrite)(bHalI2CIf_t *i2c_if, uint16_t mem_addr, const uint8_t *pbuf, uint16_t len);
-    int (*pMemRead)(bHalI2CIf_t *i2c_if, uint16_t mem_addr, uint8_t *pbuf, uint16_t len);
-} const bHalI2CDriver_t;
+} bHalI2CIf_t;
 
 /**
  * \}
  */
 
 /**
- * \defgroup I2C_Exported_Variables
+ * \defgroup I2C_Exported_Functions
  * \{
  */
 
-extern bHalI2CDriver_t bHalI2CDriver;
-
+int bMcuI2CReadByte(const bHalI2CIf_t *i2c_if, uint8_t *pbuf, uint16_t len);
+int bMcuI2CWriteByte(const bHalI2CIf_t *i2c_if, uint8_t *pbuf, uint16_t len);
+int bMcuI2CMemWrite(const bHalI2CIf_t *i2c_if, uint16_t mem_addr, uint8_t mem_addr_size,
+                    const uint8_t *pbuf, uint16_t len);
+int bMcuI2CMemRead(const bHalI2CIf_t *i2c_if, uint16_t mem_addr, uint8_t mem_addr_size,
+                   uint8_t *pbuf, uint16_t len);
+//---------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
+int bHalI2CReadByte(const bHalI2CIf_t *i2c_if, uint8_t *pbuf, uint16_t len);
+int bHalI2CWriteByte(const bHalI2CIf_t *i2c_if, uint8_t *pbuf, uint16_t len);
+int bHalI2CMemWrite(const bHalI2CIf_t *i2c_if, uint16_t mem_addr, uint8_t mem_addr_size,
+                    const uint8_t *pbuf, uint16_t len);
+int bHalI2CMemRead(const bHalI2CIf_t *i2c_if, uint16_t mem_addr, uint8_t mem_addr_size,
+                   uint8_t *pbuf, uint16_t len);
 /**
  * \}
  */

@@ -61,6 +61,10 @@ typedef enum
     B_HAL_GPIOE,
     B_HAL_GPIOF,
     B_HAL_GPIOG,
+    B_HAL_GPIOH,
+    B_HAL_GPIOI,
+    B_HAL_GPIOJ,
+    B_HAL_GPIOK,
     B_HAL_GPIO_INVALID,
 } bHalGPIOPort_t;
 
@@ -107,15 +111,48 @@ typedef struct
     bHalGPIOPin_t  pin;
 } bHalGPIOInstance_t;
 
-typedef struct
+typedef enum
 {
-    void (*pGpioConfig)(bHalGPIOPort_t port, bHalGPIOPin_t pin, bHalGPIODir_t dir,
-                        bHalGPIOPull_t pull);
-    void (*pGpioWritePin)(bHalGPIOPort_t port, bHalGPIOPin_t pin, uint8_t s);
-    void (*pGpioWritePort)(bHalGPIOPort_t port, uint16_t dat);
-    uint8_t (*pGpioReadPin)(bHalGPIOPort_t port, bHalGPIOPin_t pin);
-    uint16_t (*pGpioReadPort)(bHalGPIOPort_t port);
-} const bHalGPIODriver_t;
+    B_HAL_GPIO_EXTI0,
+    B_HAL_GPIO_EXTI1,
+    B_HAL_GPIO_EXTI2,
+    B_HAL_GPIO_EXTI3,
+    B_HAL_GPIO_EXTI4,
+    B_HAL_GPIO_EXTI5,
+    B_HAL_GPIO_EXTI6,
+    B_HAL_GPIO_EXTI7,
+    B_HAL_GPIO_EXTI8,
+    B_HAL_GPIO_EXTI9,
+    B_HAL_GPIO_EXTI10,
+    B_HAL_GPIO_EXTI11,
+    B_HAL_GPIO_EXTI12,
+    B_HAL_GPIO_EXTI13,
+    B_HAL_GPIO_EXTI14,
+    B_HAL_GPIO_EXTI15,
+    B_HAL_GPIO_EXIT_LINE_INVALID
+} bHalGPIOExtiLine_t;
+
+typedef enum
+{
+    B_HAL_GPIO_EXTI_RISE,
+    B_HAL_GPIO_EXTI_FALL,
+    B_HAL_GPIO_EXTI_BOTH,
+    B_HAL_GPIO_EXTI_HIGH,
+    B_HAL_GPIO_EXTI_LOW,
+    B_HAL_GPIO_EXIT_TRIG_INVALID
+} bHalGPIOExtiTrig_t;
+
+typedef void (*pbHalGpioExtiCallback_t)(bHalGPIOExtiLine_t line, bHalGPIOExtiTrig_t trig,
+                                        void *arg);
+
+typedef struct bHalGPIOExti
+{
+    bHalGPIOExtiLine_t      line;
+    bHalGPIOExtiTrig_t      trig;
+    pbHalGpioExtiCallback_t cb;
+    void                   *arg;
+    struct bHalGPIOExti    *next;
+} bHalGPIOExti_t;
 
 /**
  * \}
@@ -127,18 +164,46 @@ typedef struct
  */
 
 #define B_HAL_GPIO_ISVALID(port, pin) (port != B_HAL_GPIO_INVALID && pin != B_HAL_PIN_INVALID)
+#define B_HAL_GPIODIR_ISVALID(dir) (dir != B_HAL_GPIO_DIR_INVALID)
+#define B_HAL_GPIOPULL_ISVALID(pull) (pull != B_HAL_GPIO_PULL_INVALID)
 
+#define B_HAL_GPIO_ADD_EXTI_CALLBACK(_line, _trig, _cb, _arg) \
+    static bHalGPIOExti_t exti_##_line = {                    \
+        .line = _line,                                        \
+        .trig = _trig,                                        \
+        .cb   = _cb,                                          \
+        .arg  = _arg,                                         \
+        .next = NULL,                                         \
+    };                                                        \
+    bHalGpioAddExtiCallback(&exti_##_line);
 /**
  * \}
  */
 
 /**
- * \defgroup GPIO_Exported_Variables
+ * \defgroup GPIO_Exported_Functions
  * \{
  */
 
-extern bHalGPIODriver_t bHalGPIODriver;
+void bMcuGpioConfig(bHalGPIOPort_t port, bHalGPIOPin_t pin, bHalGPIODir_t dir, bHalGPIOPull_t pull);
+void bMcuGpioWritePin(bHalGPIOPort_t port, bHalGPIOPin_t pin, uint8_t s);
+void bMcuGpioWritePort(bHalGPIOPort_t port, uint16_t dat);
+uint8_t  bMcuGpioReadPin(bHalGPIOPort_t port, bHalGPIOPin_t pin);
+uint16_t bMcuGpioReadPort(bHalGPIOPort_t port);
+//---------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
+void bHalGpioConfig(bHalGPIOPort_t port, bHalGPIOPin_t pin, bHalGPIODir_t dir, bHalGPIOPull_t pull);
+void bHalGpioWritePin(bHalGPIOPort_t port, bHalGPIOPin_t pin, uint8_t s);
+void bHalGpioWritePort(bHalGPIOPort_t port, uint16_t dat);
+uint8_t  bHalGpioReadPin(bHalGPIOPort_t port, bHalGPIOPin_t pin);
+uint16_t bHalGpioReadPort(bHalGPIOPort_t port);
 
+// 驱动层调用，注册外部中断回调
+// 建议不要直接调用此函数， 使用 B_HAL_GPIO_ADD_EXTI_CALLBACK 替代
+int bHalGpioAddExtiCallback(bHalGPIOExti_t *pexti);
+
+// MCU的中断服务函数，调用此函数通知HAL层，中断触发
+void bHalGpioNotifyExti(bHalGPIOExtiLine_t line, bHalGPIOExtiTrig_t trig);
 /**
  * \}
  */

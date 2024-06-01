@@ -32,10 +32,10 @@
 /*Includes ----------------------------------------------*/
 #include "modules/inc/b_mod_error.h"
 
+#include "b_section.h"
 #include "hal/inc/b_hal.h"
-#include "core/inc/b_section.h"
 
-#if _ERROR_MANAGE_ENABLE
+#if (defined(_ERROR_MANAGE_ENABLE) && (_ERROR_MANAGE_ENABLE == 1))
 /**
  * \addtogroup BABYOS
  * \{
@@ -55,7 +55,13 @@
  * \defgroup ERROR_Private_TypesDefinitions
  * \{
  */
-
+typedef struct
+{
+    uint8_t  err;
+    uint8_t  type;
+    uint32_t s_tick;
+    uint32_t d_tick;
+} bErrorInfo_t;
 /**
  * \}
  */
@@ -117,20 +123,25 @@ static void _bErrorCore()
             continue;
         }
         if (bErrorRecord[i].s_tick == 0 ||
-            (bErrorRecord[i].type == BERROR_LEVEL_1 && bErrorRecord[i].ack == 0 &&
+            (bErrorRecord[i].type == BERROR_LEVEL_1 &&
              (tick - bErrorRecord[i].s_tick > bErrorRecord[i].d_tick)))
         {
             bErrorRecord[i].s_tick = tick;
             if (bFcb != NULL)
             {
-                bFcb(&bErrorRecord[i]);
+                bFcb(bErrorRecord[i].err);
             }
         }
     }
 }
 
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section bos_polling
+#endif
 BOS_REG_POLLING_FUNC(_bErrorCore);
-
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section 
+#endif
 /**
  * \}
  */
@@ -158,8 +169,7 @@ int bErrorInit(pecb cb)
 /**
  * \brief Register an error
  * \param err Error number
- * \param utc Current time
- * \param interval interval time (s)
+ * \param interval_ms interval time (ms)
  * \param level
  *          \arg \ref BERROR_LEVEL_0
  *          \arg \ref BERROR_LEVEL_1
@@ -167,7 +177,7 @@ int bErrorInit(pecb cb)
  *          \arg 0  OK
  *          \arg -1 ERR
  */
-int bErrorRegist(uint8_t err, uint32_t utc, uint32_t interval, uint32_t level)
+int bErrorRegist(uint8_t err, uint32_t interval_ms, uint32_t level)
 {
     static uint8_t index = 0;
     uint32_t       i     = 0;
@@ -186,9 +196,7 @@ int bErrorRegist(uint8_t err, uint32_t utc, uint32_t interval, uint32_t level)
             if (tick > bErrorRecord[i].d_tick)
             {
                 bErrorRecord[i].s_tick = 0;
-                bErrorRecord[i].utc    = utc;
                 bErrorRecord[i].type   = level;
-                bErrorRecord[i].ack    = 0;
             }
             break;
         }
@@ -196,11 +204,9 @@ int bErrorRegist(uint8_t err, uint32_t utc, uint32_t interval, uint32_t level)
     if (i >= ERROR_Q_LENGTH)
     {
         bErrorRecord[index].err    = err;
-        bErrorRecord[index].utc    = utc;
-        bErrorRecord[index].d_tick = MS2TICKS(interval * 1000);
+        bErrorRecord[index].d_tick = MS2TICKS(interval_ms);
         bErrorRecord[index].s_tick = 0;
         bErrorRecord[index].type   = level;
-        bErrorRecord[index].ack    = 0;
         index                      = (index + 1) % ERROR_Q_LENGTH;
     }
     return 0;
@@ -237,7 +243,7 @@ int bErrorClear(uint8_t e_no)
  *          \arg 0  Exist
  *          \arg -1 None
  */
-int bErrorIS_Exist(uint8_t e_no)
+int bErrorIsExist(uint8_t e_no)
 {
     int i;
     if (e_no == INVALID_ERR)
@@ -254,7 +260,7 @@ int bErrorIS_Exist(uint8_t e_no)
     return -1;
 }
 
-int bErrorIS_Empty()
+int bErrorIsEmpty()
 {
     int i = 0;
     for (i = 0; i < ERROR_Q_LENGTH; i++)
@@ -262,19 +268,6 @@ int bErrorIS_Empty()
         if (bErrorRecord[i].err != INVALID_ERR)
         {
             return -1;
-        }
-    }
-    return 0;
-}
-
-int bErrorAck(uint8_t e_no)
-{
-    int i;
-    for (i = 0; i < ERROR_Q_LENGTH; i++)
-    {
-        if (bErrorRecord[i].err == e_no)
-        {
-            bErrorRecord[i].ack = 1;
         }
     }
     return 0;

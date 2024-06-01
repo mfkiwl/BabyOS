@@ -33,11 +33,7 @@
 #include "b_config.h"
 #include "hal/inc/b_hal_uart.h"
 
-#if (_MCU_PLATFORM == 2001)
-
-#ifndef NULL
-#define NULL ((void *)0)
-#endif
+#if (defined(NATION_L40X))
 
 //      Register Address
 
@@ -73,7 +69,7 @@ typedef struct
 
 static McuUartReg_t *UartTable[5] = {MCU_UART1, MCU_UART2, MCU_UART3, MCU_UART4, MCU_UART5};
 
-static int _UartSend(bHalUartNumber_t uart, const uint8_t *pbuf, uint16_t len)
+int bMcuUartSend(bHalUartNumber_t uart, const uint8_t *pbuf, uint16_t len)
 {
     int           i       = 0;
     int           timeout = 0x000B0000;
@@ -96,10 +92,19 @@ static int _UartSend(bHalUartNumber_t uart, const uint8_t *pbuf, uint16_t len)
         }
         pUart->DAT = pbuf[i];
     }
+    timeout = 0x000B0000;
+    while (timeout > 0 && ((pUart->STS & (0x1 << 6)) == 0))
+    {
+        timeout--;
+    }
+    if (timeout <= 0)
+    {
+        return -2;
+    }
     return len;
 }
 
-static int _UartReceive(bHalUartNumber_t uart, uint8_t *pbuf, uint16_t len)
+int bMcuReceive(bHalUartNumber_t uart, uint8_t *pbuf, uint16_t len)
 {
     int           i       = 0;
     int           timeout = 0x000B0000;
@@ -124,11 +129,6 @@ static int _UartReceive(bHalUartNumber_t uart, uint8_t *pbuf, uint16_t len)
     }
     return len;
 }
-
-bHalUartDriver_t bHalUartDriver = {
-    .pSend    = _UartSend,
-    .pReceive = _UartReceive,
-};
 
 #endif
 

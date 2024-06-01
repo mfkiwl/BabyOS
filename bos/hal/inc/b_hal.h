@@ -36,18 +36,17 @@ extern "C" {
 #endif
 
 /*Includes ----------------------------------------------*/
-#include <stdint.h>
-
 #include "b_config.h"
-
+#include "b_hal_eth.h"
 #include "b_hal_flash.h"
 #include "b_hal_gpio.h"
 #include "b_hal_i2c.h"
+#include "b_hal_if.h"
+#include "b_hal_it.h"
+#include "b_hal_qspi.h"
+#include "b_hal_sdio.h"
 #include "b_hal_spi.h"
 #include "b_hal_uart.h"
-#include "b_hal_it.h"
-
-#include "b_hal_if.h"
 
 /**
  * \addtogroup B_HAL
@@ -60,34 +59,79 @@ extern "C" {
  */
 
 /**
- * \defgroup HAL_Exported_Defines
+ * \defgroup HAL_Exported_TypesDefinitions
  * \{
  */
 
-#ifndef NULL
-#define NULL ((void *)0)
-#endif
+typedef struct
+{
+    union
+    {
+        uint32_t rw_addr;
+        struct
+        {
+            bHalGPIOInstance_t data;
+            bHalGPIOInstance_t rs;
+            bHalGPIOInstance_t rd;
+            bHalGPIOInstance_t wr;
+            bHalGPIOInstance_t cs;
+        } _io;
+        struct
+        {
+            bHalGPIOInstance_t rs;
+            bHalSPIIf_t        _spi;
+        } _spi;
+    } _if;
+    // If reset pin is not used, set it to {B_HAL_GPIO_INVALID, B_HAL_PIN_INVALID}
+    bHalGPIOInstance_t reset;
+    uint8_t            if_type;  // 0: _io  1: rw_addr  2: _spi
+} bLCD_HalIf_t;
 
-#define IS_NULL(p) ((p) == NULL)
-
-#define MS2TICKS(m) (m / (1000 / _TICK_FRQ_HZ))
-
-
+#define LCD_IF_TYPE_IO (0)
+#define LCD_IF_TYPE_RWADDR (1)
+#define LCD_IF_TYPE_SPI (2)
 
 /**
  * \}
  */
 
+/**
+ * \defgroup HAL_Exported_Defines
+ * \{
+ */
+#define MS2TICKS(m) (m / (1000 / TICK_FRQ_HZ))
+#define TICKS2MS(t) (t * (1000 / TICK_FRQ_HZ))
+
+#if (defined(_HALIF_VARIABLE_ENABLE) && (_HALIF_VARIABLE_ENABLE == 1))
+#define HALIF_KEYWORD static
+#else
+#define HALIF_KEYWORD const static
+#endif
+
+/**
+ * \}
+ */
 
 /**
  * \defgroup HAL_Exported_Functions
  * \{
  */
-void     bHalIncSysTick(void);
+
+// 移植时调用，TICK中断服务函数调用bHalIncSysTick
+void bHalIncSysTick(void);
+#if defined(__WEAKDEF)
+// 弱函数，用户可重新实现此函数。bInit->bHalInit->bHalUserInit
+void bHalUserInit(void);
+#else
+// 若编译器不支持弱函数，调用此接口注册
+void bHalRegUserInit(void (*cb)(void));
+#endif
+
 void     bHalInit(void);
 void     bHalDelayMs(uint16_t xms);
 void     bHalDelayUs(uint32_t xus);
 uint32_t bHalGetSysTick(void);
+uint64_t bHalGetSysTickPlus(void);
 
 /**
  * \}

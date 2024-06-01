@@ -1,0 +1,431 @@
+#模块配置
+menu "Modules Configuration"
+
+config _BOS_MODULES_ENABLE
+    bool "Modules Enable/Disable"
+    default y
+
+config _ADCHUB_ENABLE
+    bool "Adchub Enable/Disable"
+    default n
+    depends on _BOS_MODULES_ENABLE
+
+config FILTER_BUF_SIZE
+    int "Filter Buffer Size"
+    default 10
+    depends on _ADCHUB_ENABLE
+
+config _ERROR_MANAGE_ENABLE
+    bool "Error Manage Enable/Disable"
+    default n
+    depends on _BOS_MODULES_ENABLE
+
+config ERROR_Q_LENGTH
+    int "Error Queue Length"
+    default 10
+    depends on _ERROR_MANAGE_ENABLE
+
+config _MODBUS_ENABLE
+    bool "Modbus Enable/Disable"
+    default n
+    depends on _BOS_MODULES_ENABLE
+    select _BOS_ALGO_ENABLE
+    select _ALGO_CRC_ENABLE
+    select _ALGO_CRC16_MODBUS_ENABLE
+    select _BOS_SERVICES_ENABLE
+    select _PROTOCOL_SERVICE_ENABLE
+
+config MY_DEVICE_MODBUS_REG_NUM
+    int "The value of the maximum register"
+    default 36
+    depends on _MODBUS_ENABLE
+
+config SLAVE_ADDR
+    int "Slave address (modbus slave mode)"
+    default 1
+    depends on _MODBUS_ENABLE
+
+config _PROTO_ENABLE
+    bool "Protocol Enable/Disable"
+    default n
+    depends on _BOS_MODULES_ENABLE
+    select _BOS_SERVICES_ENABLE
+    select _PROTOCOL_SERVICE_ENABLE
+
+config PROTO_FID_SIZE
+    int "Size of The Device ID Field 2 or 4 Bytes"
+    default 4
+    depends on _PROTO_ENABLE
+    range 1 4
+
+config PROTO_FLEN_SIZE
+    int "Size of The Len Field 1 or 2 Bytes"
+    default 2
+    depends on _PROTO_ENABLE
+    range 1 2
+
+config _PROTO_ENCRYPT_ENABLE
+    bool "Encrypt Enable/Disable"
+    default n
+    depends on _PROTO_ENABLE
+
+config SECRET_KEY1
+    int "Secret Key 1"
+    default 1
+    depends on _PROTO_ENCRYPT_ENABLE
+
+config SECRET_KEY2
+    int "Secret Key 2"
+    default 22
+    depends on _PROTO_ENCRYPT_ENABLE
+
+config SECRET_KEY3
+    int "Secret Key 3"
+    default 333
+    depends on _PROTO_ENCRYPT_ENABLE
+
+config SECRET_KEY4
+    int "Secret Key 4"
+    default 4444
+    depends on _PROTO_ENCRYPT_ENABLE    
+
+
+config _KV_ENABLE
+    bool "KV Enable/Disable"
+    default n
+    depends on _BOS_MODULES_ENABLE
+    select _BOS_ALGO_ENABLE
+    select _ALGO_CRC_ENABLE
+    select _ALGO_CRC32_ENABLE
+
+config _KV_MD5_ENABLE
+    bool "KV MD5 Enable/Disable"
+    default n
+    depends on _KV_ENABLE
+    select _ALGO_MD5_ENABLE
+
+config _KV_ENCRYPT_ENABLE
+    bool "KV Data Encryption"
+    default n
+    depends on _KV_ENABLE
+
+config _KV_ENCRYPT_KEY
+    int "Key 0~255"
+    default 111
+    depends on _KV_ENCRYPT_ENABLE
+
+config _XMODEM128_ENABLE
+    bool "XMODEM128 Enable/Disable"
+    default n
+    depends on _BOS_MODULES_ENABLE
+    select _BOS_SERVICES_ENABLE
+    select _PROTOCOL_SERVICE_ENABLE
+
+config _YMODEM_ENABLE
+    bool "YMODEM Enable/Disable"
+    default n
+    depends on _BOS_MODULES_ENABLE
+    select _BOS_SERVICES_ENABLE
+    select _PROTOCOL_SERVICE_ENABLE
+
+config _MENU_ENABLE
+    bool "Menu Enable/Disable"
+    default n
+    depends on _BOS_MODULES_ENABLE
+
+config MENU_ITEM_NUMBER
+    int "Menu Item Number"
+    default 10
+    depends on _MENU_ENABLE
+
+config _PWM_ENABLE
+    bool "Soft-pwm Enable/Disable"
+    default n
+    depends on _BOS_MODULES_ENABLE
+
+config _PARAM_ENABLE
+    bool "Tuning Parameters Enable/Disable"
+    default n
+    depends on _BOS_MODULES_ENABLE
+    select _NR_MICRO_SHELL_ENABLE
+
+config _STATE_ENABLE
+    bool "State Machine Enable/Disable"
+    default n
+    depends on _BOS_MODULES_ENABLE
+
+config _IAP_ENABLE
+    bool "IAP Enable/Disable"
+    default n
+    depends on _BOS_MODULES_ENABLE
+    select _BOS_ALGO_ENABLE
+    select _ALGO_CRC_ENABLE
+    select _ALGO_CRC32_ENABLE
+
+config MCUFLASH_BASE_ADDR
+    hex "McuFlash Base Address"
+    default 0x8000000
+    depends on _IAP_ENABLE
+
+config BOOT_START_ADDR
+    hex "Bootloader Start Address"
+    default 0x8000000
+    depends on _IAP_ENABLE
+
+config IAP_FLAG_ADDR
+    hex "IAP Flag Address"
+    default 0x8014000
+    depends on _IAP_ENABLE
+
+config APP_START_ADDR
+    hex "App Start Address"
+    default 0x8014800
+    depends on _IAP_ENABLE
+
+config RECEIVE_FIRMWARE_MODE
+    int "Receive New Firmware 0(boot) 1(app)"
+    default 1
+    depends on _IAP_ENABLE
+    range 0 1
+
+config IAP_FILE_CACHE
+    int "File Cache 0(none) 1(on-chip flash) 2(spiflash)"
+    default 2
+    depends on _IAP_ENABLE
+    range 0 2
+
+config IAP_FW_SAVE_ADDR
+    hex "Firmware Save Address"
+    default 0x0
+    depends on _IAP_ENABLE
+
+config _BACKUP_ENABLE
+    bool "Backup Enable/Disable"
+    default n
+    depends on _IAP_ENABLE
+
+config IAP_BACKUP_LOCATION
+    int "Backup Location 0(on-chip flash) 1(spiflash)"
+    default 1
+    depends on _BACKUP_ENABLE
+    range 0 1
+
+config IAP_BACKUP_ADDR
+    hex "Backup Address"
+    default 0x32000
+    depends on _BACKUP_ENABLE
+
+config IAP_BACKUP_SIZE
+    hex "Backup Area Size"
+    default 0x14000
+    depends on _BACKUP_ENABLE  
+
+config _WIFI_ENABLE
+    bool "WiFi Enable/Disable"
+    default n
+    depends on _BOS_MODULES_ENABLE  
+    select _CJSON_ENABLE
+
+config _SELECT_ENABLE
+    bool "Select Enable/Disable"
+    default n
+    depends on _BOS_MODULES_ENABLE
+
+config SELECT_FDS_NUMBER
+    int "Select-fds Max-Number"
+    default 32
+    depends on _SELECT_ENABLE
+
+config _GUI_ENABLE
+    bool "GUI Enable/Disable"
+    default n
+    depends on _BOS_MODULES_ENABLE
+
+config GUI_REFR_PERIOD
+    int "GUI Refresh Period x ms"
+    default 33
+    select _UGUI_ENABLE
+
+choice
+    prompt "Color RGBXXX"
+    depends on _GUI_ENABLE
+    default _GUI_RGB_565
+config _GUI_RGB_888
+    bool "rgb888"
+config _GUI_RGB_565
+    bool "rgb565"
+config _GUI_RGB_8BIT
+    bool "rgb_8bit"    
+endchoice
+
+config _USE_UGUI
+    bool "Use Thirdparty/uGUI"
+    default y
+    depends on _GUI_ENABLE
+    select _UGUI_ENABLE
+
+config _USE_LVGL
+    bool "Use thirdparty/lvgl"
+    default n
+    depends on _GUI_ENABLE
+    select _LVGL_ENABLE
+
+config LVGL_DISP_BUF_NUM
+    int "The number of buffers used for partial rendering"
+    default 1
+    range 1 2
+    depends on _USE_LVGL
+
+config _USE_ARM_2D
+    bool "Use thirdparty/arm-2d"
+    default n
+    depends on _GUI_ENABLE
+    select _ARM_2D_ENABLE
+
+config PFB_WIDTH
+    int "PFB block width"
+    default 16
+    depends on _USE_ARM_2D
+
+config PFB_HEIGHT
+    int "PFB block height"
+    default 16
+    depends on _USE_ARM_2D    
+
+config __ARM_2D_HAS_ASYNC__
+    bool "Enable Asynchronous Programmers' model support"
+    default n
+    depends on _USE_ARM_2D
+
+config __ARM_2D_HAS_ANTI_ALIAS_TRANSFORM__
+    bool "Enable anti-alias support for all tranform operations."
+    default y
+    depends on _USE_ARM_2D
+
+config __ARM_2D_CFG_SUPPORT_COLOUR_CHANNEL_ACCESS__
+    bool "Enable support for accessing individual colour channels"
+    default y
+    depends on _USE_ARM_2D
+
+config __ARM_2D_CFG_OPTIMIZE_FOR_POINTER_LIKE_SHAPES_IN_TRANSFORM__
+    bool "Optimize the scaler version of transform operations for pointer-like resources"
+    default y
+    depends on _USE_ARM_2D
+
+config __LCD_PRINT_ENABLE
+    bool "__RTE_ACCELERATION_ARM_2D_EXTRA_LCD_PRINTF__"
+    default n
+    depends on _USE_ARM_2D
+
+config __LCD_PRINTF_CFG_TEXT_BUFFER_SIZE__
+    int "The size of the LCD printf text buffer <16-65535>"
+    default 16
+    range 16 65525
+    depends on _USE_ARM_2D  
+
+config __GLCD_CFG_SCEEN_WIDTH__
+    int "Width of the screen <8-32767>"
+    default 240
+    range 8 32767
+    depends on _USE_ARM_2D  
+
+config __GLCD_CFG_SCEEN_HEIGHT__
+    int "Height of the screen <8-32767>"
+    default 320
+    range 8 32767
+    depends on _USE_ARM_2D  
+
+config _NETIF_ENABLE
+    bool "NETIF Enable/Disable"
+    default n
+    depends on _BOS_MODULES_ENABLE
+    select _BOS_SERVICES_ENABLE
+    select _TCPIP_SERVICE_ENABLE
+
+config _NETIF_USE_LWIP
+    bool "NETIF USE LWIP"
+    default y
+    depends on _NETIF_ENABLE
+
+config NETIF_DEV_NO
+    int "Network device number"
+    default 1
+    depends on _NETIF_USE_LWIP
+
+choice
+    prompt "Ways to obtain an IP address"
+    depends on _NETIF_USE_LWIP
+    default _GUI_RGB_565
+config NETIF_USE_DHCP
+    bool "Dynamic IP"
+config NETIF_USE_STATIC_IP
+    bool "Static IP"   
+endchoice
+
+config NETIF_IP_ADDRESS
+    string "IP Address"
+    default "192.168.169.55"
+    depends on NETIF_USE_STATIC_IP
+
+config NETIF_GW_ADDRESS
+    string "GW Address"
+    default "192.168.169.1"
+    depends on NETIF_USE_STATIC_IP
+
+config NETIF_MASK_ADDRESS
+    string "MASK Address"
+    default "255.255.255.0"
+    depends on NETIF_USE_STATIC_IP
+
+config NETIF_LINK_CHECK_INTERVAL
+    int "Check Link Time Interval (ms)"
+    default 200
+    depends on _NETIF_USE_LWIP
+
+config NETIF_CHECKSUM_BY_HARDWARE
+    bool "HECKSUM_BY_HARDWARE enabled"
+    default n
+    depends on _NETIF_USE_LWIP
+
+config MEM_SIZE_FOR_LWIP
+    int "Size of The Heap Memory"
+    default 10240
+    depends on _NETIF_USE_LWIP
+
+config REMOTE_ADDR_LEN_MAX
+    int "Maximum length of remote address"
+    default 128
+    depends on _NETIF_ENABLE
+
+config CONNECT_RECVBUF_MAX
+    int "Recv Buffer Max Length (B)"
+    default 4096
+    depends on _NETIF_ENABLE
+
+config SERVER_MAX_CONNECTIONS
+    int "The maximum number of connections that can be saved on the server"
+    default 2
+    depends on _NETIF_ENABLE
+
+config _USB_ENABLE
+    bool "USB Enable/Disable"
+    default n
+    depends on _BOS_MODULES_ENABLE
+    select _TINYUSB_ENABLE
+
+config USB_MANUFACTURER
+    string "Manufacturer"
+    default "BabyOS"
+    depends on _USB_ENABLE
+
+config USB_PRODUCT
+    string "Product"
+    default "BabyOS-USB"
+    depends on _USB_ENABLE
+
+config USB_SERIAL_NUMBER
+    string "Serials"
+    default "BabyOS-USB0"
+    depends on _USB_ENABLE
+
+endmenu

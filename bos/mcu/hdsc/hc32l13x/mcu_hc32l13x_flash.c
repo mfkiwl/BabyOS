@@ -35,7 +35,7 @@
 #include "b_config.h"
 #include "hal/inc/b_hal_flash.h"
 
-#if (_MCU_PLATFORM == 4001)
+#if (defined(HC32L13X))
 
 #define FLASH_BASE_ADDR (0x0000000UL)
 #define FLASH_PAGE_SIZE (512)
@@ -65,12 +65,12 @@ typedef struct
 
 #define MCU_FLASH ((McuFlashReg_t *)0x40020000)
 
-static int _FlashInit()
+int bMcuFlashInit()
 {
     return 0;
 }
 
-static int _FlashUnlock()
+int bMcuFlashUnlock()
 {
     int retval        = 0;
     MCU_FLASH->BYPASS = FLASH_KEY_1;
@@ -79,7 +79,7 @@ static int _FlashUnlock()
     return retval;
 }
 
-static int _FlashLock()
+int bMcuFlashLock()
 {
     int retval        = 0;
     MCU_FLASH->BYPASS = FLASH_KEY_1;
@@ -88,11 +88,11 @@ static int _FlashLock()
     return retval;
 }
 
-static int _FlashErase(uint32_t raddr, uint8_t pages)
+int bMcuFlashErase(uint32_t raddr, uint32_t pages)
 {
-    int     retval  = 0;
-    int     timeout = 0;
-    uint8_t i       = 0;
+    int      retval  = 0;
+    int      timeout = 0;
+    uint32_t i       = 0;
 
     raddr = FLASH_BASE_ADDR + raddr;
     raddr = raddr / FLASH_PAGE_SIZE * FLASH_PAGE_SIZE;
@@ -137,7 +137,7 @@ static int _FlashErase(uint32_t raddr, uint8_t pages)
         }
         raddr += FLASH_PAGE_SIZE;
     }
-    
+
     timeout = FLASH_PER_TIMEOUT;
     while ((MCU_FLASH->CR & 0x3) != 0 && timeout > 0)
     {
@@ -153,16 +153,16 @@ static int _FlashErase(uint32_t raddr, uint8_t pages)
     if (timeout <= 0)
     {
         return -2;
-    }    
-    
+    }
+
     return retval;
 }
 
-static int _FlashWrite(uint32_t raddr, const uint8_t *pbuf, uint16_t len)
+int bMcuFlashWrite(uint32_t raddr, const uint8_t *pbuf, uint32_t len)
 {
-    int     timeout = 0;
-    uint8_t wdata   = 0;
-    uint8_t wlen = len, i = 0;
+    int      timeout = 0;
+    uint8_t  wdata   = 0;
+    uint32_t wlen = len, i = 0;
     raddr = FLASH_BASE_ADDR + raddr;
     if (pbuf == NULL || (raddr & 0x1) || (raddr + len) > (FLASH_MAX_SIZE + FLASH_BASE_ADDR) ||
         ((MCU_FLASH->CR) & (0x1 << 4)) != 0)
@@ -204,7 +204,7 @@ static int _FlashWrite(uint32_t raddr, const uint8_t *pbuf, uint16_t len)
         }
         raddr += 1;
     }
-    
+
     timeout = FLASH_PER_TIMEOUT;
     while ((MCU_FLASH->CR & 0x3) != 0 && timeout > 0)
     {
@@ -220,13 +220,12 @@ static int _FlashWrite(uint32_t raddr, const uint8_t *pbuf, uint16_t len)
     if (timeout <= 0)
     {
         return -2;
-    } 
+    }
 
-    
     return wlen;
 }
 
-static int _FlashRead(uint32_t raddr, uint8_t *pbuf, uint16_t len)
+int bMcuFlashRead(uint32_t raddr, uint8_t *pbuf, uint32_t len)
 {
     if (pbuf == NULL || (raddr + FLASH_BASE_ADDR + len) > (FLASH_MAX_SIZE + FLASH_BASE_ADDR))
     {
@@ -237,14 +236,15 @@ static int _FlashRead(uint32_t raddr, uint8_t *pbuf, uint16_t len)
     return len;
 }
 
-bHalFlashDriver_t bHalFlashDriver = {
-    .pFlashInit   = _FlashInit,
-    .pFlashUnlock = _FlashUnlock,
-    .pFlashLock   = _FlashLock,
-    .pFlashErase  = _FlashErase,
-    .pFlashWrite  = _FlashWrite,
-    .pFlashRead   = _FlashRead,
-};
+uint32_t bMcuFlashSectorSize()
+{
+    return FLASH_PAGE_SIZE;
+}
+
+uint32_t bMcuFlashChipSize()
+{
+    return FLASH_MAX_SIZE;
+}
 
 #endif
 

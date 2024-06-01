@@ -33,8 +33,8 @@
 #include "b_config.h"
 #include "hal/inc/b_hal_gpio.h"
 
-#if (_MCU_PLATFORM == 1001 || _MCU_PLATFORM == 1002 || _MCU_PLATFORM == 1003 || \
-     _MCU_PLATFORM == 1004)
+#if (defined(STM32F10X_LD) || defined(STM32F10X_MD) || defined(STM32F10X_HD) || \
+     defined(STM32F10X_CL))
 
 //         Register Address
 
@@ -52,8 +52,7 @@ typedef struct
     volatile uint32_t LCKR;
 } McuGpioReg_t;
 
-static void _GpioConfig(bHalGPIOPort_t port, bHalGPIOPin_t pin, bHalGPIODir_t dir,
-                        bHalGPIOPull_t pull)
+void bMcuGpioConfig(bHalGPIOPort_t port, bHalGPIOPin_t pin, bHalGPIODir_t dir, bHalGPIOPull_t pull)
 {
     uint32_t      dir_val  = 4;
     uint32_t      pull_val = 0;
@@ -97,13 +96,13 @@ static void _GpioConfig(bHalGPIOPort_t port, bHalGPIOPin_t pin, bHalGPIODir_t di
         }
         else
         {
-            pGpio->CRH &= ~(0x0000000F << (pin * 4));
-            pGpio->CRH |= (dir_val << (pin * 4));
+            pGpio->CRH &= ~(0x0000000F << ((pin - B_HAL_PIN8) * 4));
+            pGpio->CRH |= (dir_val << ((pin - B_HAL_PIN8) * 4));
         }
     }
 }
 
-static void _GpioWritePin(bHalGPIOPort_t port, bHalGPIOPin_t pin, uint8_t s)
+void bMcuGpioWritePin(bHalGPIOPort_t port, bHalGPIOPin_t pin, uint8_t s)
 {
     uint32_t      cs_val = 0x00000001 << pin;
     McuGpioReg_t *pGpio  = (McuGpioReg_t *)(GPIO_REG_BASE + port * GPIO_REG_OFF);
@@ -118,7 +117,7 @@ static void _GpioWritePin(bHalGPIOPort_t port, bHalGPIOPin_t pin, uint8_t s)
     pGpio->BSRR = cs_val;
 }
 
-static uint8_t _GpioReadPin(bHalGPIOPort_t port, bHalGPIOPin_t pin)
+uint8_t bMcuGpioReadPin(bHalGPIOPort_t port, bHalGPIOPin_t pin)
 {
     uint32_t      id_val = 0;
     McuGpioReg_t *pGpio  = (McuGpioReg_t *)(GPIO_REG_BASE + port * GPIO_REG_OFF);
@@ -130,7 +129,7 @@ static uint8_t _GpioReadPin(bHalGPIOPort_t port, bHalGPIOPin_t pin)
     return ((id_val & (0x0001 << pin)) != 0);
 }
 
-static void _GpioWrite(bHalGPIOPort_t port, uint16_t dat)
+void bMcuGpioWritePort(bHalGPIOPort_t port, uint16_t dat)
 {
     McuGpioReg_t *pGpio = (McuGpioReg_t *)(GPIO_REG_BASE + port * GPIO_REG_OFF);
     if (!B_HAL_GPIO_ISVALID(port, 0))
@@ -140,7 +139,7 @@ static void _GpioWrite(bHalGPIOPort_t port, uint16_t dat)
     pGpio->ODR = dat;
 }
 
-static uint16_t _GpioRead(bHalGPIOPort_t port)
+uint16_t bMcuGpioReadPort(bHalGPIOPort_t port)
 {
     uint32_t      id_val = 0;
     McuGpioReg_t *pGpio  = (McuGpioReg_t *)(GPIO_REG_BASE + port * GPIO_REG_OFF);
@@ -151,14 +150,6 @@ static uint16_t _GpioRead(bHalGPIOPort_t port)
     id_val = pGpio->IDR;
     return (id_val & 0xffff);
 }
-
-bHalGPIODriver_t bHalGPIODriver = {
-    .pGpioConfig    = _GpioConfig,
-    .pGpioWritePin  = _GpioWritePin,
-    .pGpioWritePort = _GpioWrite,
-    .pGpioReadPin   = _GpioReadPin,
-    .pGpioReadPort  = _GpioRead,
-};
 
 #endif
 /************************ Copyright (c) 2020 Bean *****END OF FILE****/

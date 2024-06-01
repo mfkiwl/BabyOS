@@ -55,7 +55,7 @@
  * \defgroup MCUFLASH_Private_Defines
  * \{
  */
-
+#define DRIVER_NAME MCUFLASH
 /**
  * \}
  */
@@ -73,8 +73,7 @@
  * \defgroup MCUFLASH_Private_Variables
  * \{
  */
-
-bMCUFLASH_Driver_t bMCUFLASH_Driver;
+bDRIVER_HALIF_TABLE(bMCUFLASH_HalIf_t, DRIVER_NAME);
 /**
  * \}
  */
@@ -93,27 +92,27 @@ bMCUFLASH_Driver_t bMCUFLASH_Driver;
  * \{
  */
 
-static int _bMCUFLASHOpen(bMCUFLASH_Driver_t *pdrv)
+static int _bMCUFLASHOpen(bDriverInterface_t *pdrv)
 {
-    return bHalFlashDriver.pFlashUnlock();
+    return bHalFlashUnlock();
 }
 
-static int _bMCUFLASHClose(bMCUFLASH_Driver_t *pdrv)
+static int _bMCUFLASHClose(bDriverInterface_t *pdrv)
 {
-    return bHalFlashDriver.pFlashLock();
+    return bHalFlashLock();
 }
 
-static int _bMCUFLASHWrite(bMCUFLASH_Driver_t *pdrv, uint32_t off, uint8_t *pbuf, uint16_t len)
+static int _bMCUFLASHWrite(bDriverInterface_t *pdrv, uint32_t off, uint8_t *pbuf, uint32_t len)
 {
-    return bHalFlashDriver.pFlashWrite(off, pbuf, len);
+    return bHalFlashWrite(off, pbuf, len);
 }
 
-static int _bMCUFLASHRead(bMCUFLASH_Driver_t *pdrv, uint32_t off, uint8_t *pbuf, uint16_t len)
+static int _bMCUFLASHRead(bDriverInterface_t *pdrv, uint32_t off, uint8_t *pbuf, uint32_t len)
 {
-    return bHalFlashDriver.pFlashRead(off, pbuf, len);
+    return bHalFlashRead(off, pbuf, len);
 }
 
-static int _bMCUFLASHCtl(bMCUFLASH_Driver_t *pdrv, uint8_t cmd, void *param)
+static int _bMCUFLASHCtl(bDriverInterface_t *pdrv, uint8_t cmd, void *param)
 {
     int retval = -1;
     switch (cmd)
@@ -123,8 +122,26 @@ static int _bMCUFLASHCtl(bMCUFLASH_Driver_t *pdrv, uint8_t cmd, void *param)
             if (param)
             {
                 bFlashErase_t *perase_param = (bFlashErase_t *)param;
-                bHalFlashDriver.pFlashErase(perase_param->addr, perase_param->num);
+                bHalFlashErase(perase_param->addr, perase_param->num);
                 retval = 0;
+            }
+        }
+        break;
+        case bCMD_GET_SECTOR_SIZE:
+        {
+            if (param)
+            {
+                ((uint32_t *)param)[0] = bHalFlashSectorSize();
+                retval                 = 0;
+            }
+        }
+        break;
+        case bCMD_GET_SECTOR_COUNT:
+        {
+            if (param)
+            {
+                ((uint32_t *)param)[0] = bHalFlashChipSize() / bHalFlashSectorSize();
+                retval                 = 0;
             }
         }
         break;
@@ -140,26 +157,29 @@ static int _bMCUFLASHCtl(bMCUFLASH_Driver_t *pdrv, uint8_t cmd, void *param)
  * \addtogroup MCUFLASH_Exported_Functions
  * \{
  */
-int bMCUFLASH_Init()
+int bMCUFLASH_Init(bDriverInterface_t *pdrv)
 {
-    int retval              = 0;
-    bMCUFLASH_Driver.status = 0;
-    bMCUFLASH_Driver.close  = _bMCUFLASHClose;
-    bMCUFLASH_Driver.read   = _bMCUFLASHRead;
-    bMCUFLASH_Driver.ctl    = _bMCUFLASHCtl;
-    bMCUFLASH_Driver.open   = _bMCUFLASHOpen;
-    bMCUFLASH_Driver.write  = _bMCUFLASHWrite;
+    bDRIVER_STRUCT_INIT(pdrv, DRIVER_NAME, bMCUFLASH_Init);
+    pdrv->close = _bMCUFLASHClose;
+    pdrv->read  = _bMCUFLASHRead;
+    pdrv->ctl   = _bMCUFLASHCtl;
+    pdrv->open  = _bMCUFLASHOpen;
+    pdrv->write = _bMCUFLASHWrite;
 
-    if (bHalFlashDriver.pFlashInit() < 0)
+    if (bHalFlashInit() < 0)
     {
-        bMCUFLASH_Driver.status = -1;
-        retval                  = -1;
+        return -1;
     }
-    return retval;
+    return 0;
 }
 
-bDRIVER_REG_INIT(bMCUFLASH_Init);
-
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section driver_init
+#endif
+bDRIVER_REG_INIT(B_DRIVER_MCUFLASH, bMCUFLASH_Init);
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section 
+#endif
 /**
  * \}
  */

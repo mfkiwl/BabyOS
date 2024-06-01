@@ -40,13 +40,15 @@ extern "C" {
 
 #include "b_config.h"
 
-#if _FS_ENABLE
+#if (defined(_FS_ENABLE) && (_FS_ENABLE == 1))
 
-#if (_FS_SELECT == 0)
-#include "thirdparty/FatFS/ff.h"
+#if (defined(FS_FATFS))
+#include "thirdparty/fatfs/ff.h"
+/*************************************/
+#include "thirdparty/fatfs/diskio.h"
 #endif
 
-#if (_FS_SELECT == 1)
+#if (defined(FS_LITTLEFS))
 #include "thirdparty/littlefs/lfs.h"
 #endif
 
@@ -87,8 +89,6 @@ typedef enum
  * \defgroup FS_Exported_Defines
  * \{
  */
-#define DEV_SPIFLASH 0 /* Map SPIFLASH to physical drive 0*/
-#define DEV_SDCARD 1   /* Map SDCARD to physical drive 1*/
 
 /**
  * \}
@@ -99,7 +99,7 @@ typedef enum
  * \{
  */
 
-#if _FS_SELECT == 1
+#if defined(FS_LITTLEFS)
 extern lfs_t bLittleFS;
 #endif
 

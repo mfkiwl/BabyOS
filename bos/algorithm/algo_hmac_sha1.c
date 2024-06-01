@@ -30,7 +30,9 @@
  */
 
 /*Includes ----------------------------------------------*/
-#include "algorithm/inc/algo_hmac_sha1.h"
+#include "inc/algo_hmac_sha1.h"
+
+#if (defined(_ALGO_SHA1_ENABLE) && (_ALGO_SHA1_ENABLE == 1))
 
 /**
  * \addtogroup ALGORITHM
@@ -93,7 +95,7 @@
  */
 uint32_t ft(int t, uint32_t x, uint32_t y, uint32_t z)
 {
-    uint32_t a, b, c;
+    uint32_t a = 0, b = 0, c = 0;
 
     if (t < 20)
     {
@@ -121,7 +123,7 @@ uint32_t ft(int t, uint32_t x, uint32_t y, uint32_t z)
 
 uint32_t k(int t)
 {
-    uint32_t c;
+    uint32_t c = 0;
 
     if (t < 20)
     {
@@ -467,5 +469,7 @@ void hmac_sha1(uint8_t *key, int key_length, uint8_t *data, int data_length, uin
 /**
  * \}
  */
+
+#endif
 
 /************************ Copyright (c) 2020 Bean *****END OF FILE****/

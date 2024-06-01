@@ -32,9 +32,10 @@
 /*Includes ----------------------------------------------*/
 #include "core/inc/b_core.h"
 
+#include "b_section.h"
 #include "core/inc/b_device.h"
-#include "core/inc/b_section.h"
 #include "hal/inc/b_hal.h"
+#include "utils/inc/b_util_log.h"
 
 /**
  * \addtogroup BABYOS
@@ -83,7 +84,7 @@
  * \{
  */
 
-static bCoreFd_t bCoreFdTable[BCORE_FD_MAX];
+static bCoreFd_t bCoreFdTable[B_REG_DEV_NUMBER];
 
 bSECTION_DEF_FLASH(bos_polling, pbPoling_t);
 /**
@@ -95,7 +96,15 @@ bSECTION_DEF_FLASH(bos_polling, pbPoling_t);
  * \{
  */
 static void _bCoreMonitor(void);
+
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section bos_polling
+#endif
 BOS_REG_POLLING_FUNC(_bCoreMonitor);
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section 
+#endif
+
 /**
  * \}
  */
@@ -110,21 +119,21 @@ static void _bCoreMonitor()
     ;
 }
 
-static int _bCoreCreateFd(uint8_t dev_no, uint8_t flag)
+static int _bCoreCreateFd(uint32_t dev_no, uint8_t flag)
 {
     int            i    = 0;
     int            fd   = -1;
     static uint8_t init = 0;
     if (init == 0)
     {
-        init = 1;
-        for (i = 0; i < BCORE_FD_MAX; i++)
+        for (i = 0; i < B_REG_DEV_NUMBER; i++)
         {
             bCoreFdTable[i].status = BCORE_STA_NULL;
         }
+        init = 1;
     }
 
-    for (i = 0; i < BCORE_FD_MAX; i++)
+    for (i = 0; i < B_REG_DEV_NUMBER; i++)
     {
         if (bCoreFdTable[i].status == BCORE_STA_OPEN)
         {
@@ -135,7 +144,7 @@ static int _bCoreCreateFd(uint8_t dev_no, uint8_t flag)
         }
     }
 
-    for (i = 0; i < BCORE_FD_MAX; i++)
+    for (i = 0; i < B_REG_DEV_NUMBER; i++)
     {
         if (bCoreFdTable[i].status == BCORE_STA_NULL)
         {
@@ -184,9 +193,10 @@ static int _bCoreDeleteFd(int fd)
  *          \arg 0  OK
  *          \arg -1 ERR
  */
-int bOpen(uint8_t dev_no, uint8_t flag)
+int bOpen(uint32_t dev_no, uint8_t flag)
 {
-    int fd = -1;
+    int fd     = -1;
+    int retval = 0;
     if (!IS_VALID_FLAG(flag))
     {
         return -1;
@@ -196,7 +206,8 @@ int bOpen(uint8_t dev_no, uint8_t flag)
     {
         return -1;
     }
-    if (bDeviceOpen(dev_no) >= 0)
+    retval = bDeviceOpen(dev_no);
+    if (retval >= 0 || retval == B_DEVICE_FUNC_NULL)
     {
         return fd;
     }
@@ -204,15 +215,15 @@ int bOpen(uint8_t dev_no, uint8_t flag)
     return -1;
 }
 
-int bRead(int fd, uint8_t *pdata, uint16_t len)
+int bRead(int fd, uint8_t *pdata, uint32_t len)
 {
     int retval;
-    if (fd < 0 || fd >= BCORE_FD_MAX || pdata == NULL)
+    if (fd < 0 || fd >= B_REG_DEV_NUMBER || pdata == NULL)
     {
         return -1;
     }
 
-    if (bCoreFdTable[fd].flag == BCORE_FLAG_W || bCoreFdTable[fd].status == BCORE_STA_NULL)
+    if (!READ_IS_VALID(bCoreFdTable[fd].flag) || bCoreFdTable[fd].status == BCORE_STA_NULL)
     {
         return -1;
     }
@@ -225,15 +236,15 @@ int bRead(int fd, uint8_t *pdata, uint16_t len)
     return retval;
 }
 
-int bWrite(int fd, uint8_t *pdata, uint16_t len)
+int bWrite(int fd, uint8_t *pdata, uint32_t len)
 {
     int retval;
-    if (fd < 0 || fd >= BCORE_FD_MAX || pdata == NULL)
+    if (fd < 0 || fd >= B_REG_DEV_NUMBER || pdata == NULL)
     {
         return -1;
     }
 
-    if (bCoreFdTable[fd].flag == BCORE_FLAG_R || bCoreFdTable[fd].status == BCORE_STA_NULL)
+    if (!WRITE_IS_VALID(bCoreFdTable[fd].flag) || bCoreFdTable[fd].status == BCORE_STA_NULL)
     {
         return -1;
     }
@@ -248,7 +259,7 @@ int bWrite(int fd, uint8_t *pdata, uint16_t len)
 
 int bLseek(int fd, uint32_t off)
 {
-    if (fd < 0 || fd >= BCORE_FD_MAX)
+    if (fd < 0 || fd >= B_REG_DEV_NUMBER)
     {
         return -1;
     }
@@ -263,7 +274,7 @@ int bLseek(int fd, uint32_t off)
 
 int bCtl(int fd, uint8_t cmd, void *param)
 {
-    if (fd < 0 || fd >= BCORE_FD_MAX)
+    if (fd < 0 || fd >= B_REG_DEV_NUMBER)
     {
         return -1;
     }
@@ -272,7 +283,7 @@ int bCtl(int fd, uint8_t cmd, void *param)
 
 int bClose(int fd)
 {
-    if (fd < 0 || fd >= BCORE_FD_MAX)
+    if (fd < 0 || fd >= B_REG_DEV_NUMBER)
     {
         return -1;
     }
@@ -288,7 +299,7 @@ int bClose(int fd)
 int bCoreIsIdle()
 {
     int i;
-    for (i = 0; i < BCORE_FD_MAX; i++)
+    for (i = 0; i < B_REG_DEV_NUMBER; i++)
     {
         if (bCoreFdTable[i].status == BCORE_STA_OPEN)
         {
@@ -318,8 +329,13 @@ int bInit()
     b_log("HW:%d.%d.%d FW:%d.%d.%d COMPILE:%s-%s\r\n", (HW_VERSION / 10000),
           (HW_VERSION % 10000) / 100, HW_VERSION % 100, (FW_VERSION / 10000),
           (FW_VERSION % 10000) / 100, FW_VERSION % 100, __DATE__, __TIME__);
-    b_log("device number:%d\r\n", bDEV_MAX_NUM);
+    b_log("device number:%d\r\n", B_REG_DEV_NUMBER);
     return bDeviceInit();
+}
+
+int bReinit(uint32_t dev_no)
+{
+    return bDeviceReinit(dev_no);
 }
 
 /**
@@ -336,6 +352,66 @@ int bExec()
     }
     return 0;
 }
+
+/**
+ * \brief  eg. bModifyHalIf(OLED, sizeof(bOLED_HalIf_t),
+ *                           (uint8_t)(&(((bOLED_HalIf_t *)0)->_if._i2c.dev_addr)),
+ *                            &dev_addr, 1);
+ * \retval Result
+ *          \arg 0  OK
+ *          \arg -1 ERR
+ */
+int bModifyHalIf(uint32_t dev_no, uint32_t type_size, uint32_t off, const uint8_t *pval,
+                 uint8_t len)
+{
+    if ((off + len) > type_size || pval == NULL || len == 0 || type_size == 0)
+    {
+        return -1;
+    }
+    return bDeviceModifyHalIf(dev_no, off, pval, len);
+}
+
+uint8_t bFdIsReadable(int fd)
+{
+    if (fd < 0 || fd >= B_REG_DEV_NUMBER)
+    {
+        return 0;
+    }
+    return bDeviceIsReadable(bCoreFdTable[fd].number);
+}
+
+uint8_t bFdIsWritable(int fd)
+{
+    if (fd < 0 || fd >= B_REG_DEV_NUMBER)
+    {
+        return 0;
+    }
+    return bDeviceIsWritable(bCoreFdTable[fd].number);
+}
+
+uint8_t bFdIsAbnormal(int fd)
+{
+    if (fd < 0 || fd >= B_REG_DEV_NUMBER)
+    {
+        return 1;
+    }
+    return bDeviceIsAbnormal(bCoreFdTable[fd].number);
+}
+
+int bGetDevNumber(int fd, uint32_t *pdev_no)
+{
+    if (fd < 0 || fd >= B_REG_DEV_NUMBER || pdev_no == NULL)
+    {
+        return -1;
+    }
+    if (bCoreFdTable[fd].status != BCORE_STA_OPEN)
+    {
+        return -1;
+    }
+    *pdev_no = bCoreFdTable[fd].number;
+    return 0;
+}
+
 
 /**
  * \}

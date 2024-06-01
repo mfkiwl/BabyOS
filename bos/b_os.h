@@ -48,6 +48,10 @@ extern "C" {
 #define _BOS_MODULES_ENABLE (0)
 #endif
 
+#ifndef _BOS_SERVICES_ENABLE
+#define _BOS_SERVICES_ENABLE (0)
+#endif
+
 /**
  * \addtogroup BABYOS
  * \{
@@ -73,11 +77,52 @@ extern "C" {
 
 #include "core/inc/b_core.h"
 #include "core/inc/b_device.h"
+#include "core/inc/b_queue.h"
+#include "core/inc/b_sem.h"
+#include "core/inc/b_task.h"
+#include "core/inc/b_timer.h"
 #include "drivers/inc/b_driver.h"
+#include "utils/inc/b_utils.h"
+
+#if _BOS_SERVICES_ENABLE
+#include "services/inc/b_services.h"
+#endif
 
 #if _BOS_MODULES_ENABLE
 #include "modules/inc/b_modules.h"
 #endif
+
+#include "drivers/inc/b_drv_24cxx.h"
+#include "drivers/inc/b_drv_ds18b20.h"
+#include "drivers/inc/b_drv_esp12f.h"
+#include "drivers/inc/b_drv_fm25cl.h"
+#include "drivers/inc/b_drv_icm20948.h"
+#include "drivers/inc/b_drv_icm42688p.h"
+#include "drivers/inc/b_drv_ili9320.h"
+#include "drivers/inc/b_drv_ili9341.h"
+#include "drivers/inc/b_drv_key.h"
+#include "drivers/inc/b_drv_lis3dh.h"
+#include "drivers/inc/b_drv_ltc2662iuh_12.h"
+#include "drivers/inc/b_drv_matrixkeys.h"
+#include "drivers/inc/b_drv_mcuflash.h"
+#include "drivers/inc/b_drv_oled.h"
+#include "drivers/inc/b_drv_paj7620u2.h"
+#include "drivers/inc/b_drv_pcf8574.h"
+#include "drivers/inc/b_drv_qmc5883l.h"
+#include "drivers/inc/b_drv_qmi8658a.h"
+#include "drivers/inc/b_drv_rs485.h"
+#include "drivers/inc/b_drv_sd.h"
+#include "drivers/inc/b_drv_spiflash.h"
+#include "drivers/inc/b_drv_ssd1289.h"
+#include "drivers/inc/b_drv_st7789.h"
+#include "drivers/inc/b_drv_xpt2046.h"
+
+
+// thirdparty
+#include "thirdparty/cjson/cjson.h"
+#include "thirdparty/pt/pt-sem.h"
+#include "thirdparty/pt/pt.h"
+#include "thirdparty/unity/unity.h"
 
 /**
  * \}

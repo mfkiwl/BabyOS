@@ -32,7 +32,7 @@
 /*Includes ----------------------------------------------*/
 #include "drivers/inc/b_drv_spiflash.h"
 
-#include "thirdparty/SFUD/inc/sfud.h"
+#include "drivers/sfud/inc/sfud.h"
 
 /**
  * \addtogroup BABYOS
@@ -53,6 +53,10 @@
  * \defgroup SPIFLASH_Private_TypesDefinitions
  * \{
  */
+typedef struct
+{
+    sfud_flash sflash;
+} bSpiFlashPrivate_t;
 
 /**
  * \}
@@ -63,8 +67,11 @@
  * \{
  */
 #ifndef SFUD_USING_SFDP
-#err "please add bos/thirdparty/SFUD"
+#err "please add sfud"
 #endif
+
+#define DRIVER_NAME SPIFLASH
+
 /**
  * \}
  */
@@ -82,13 +89,13 @@
  * \defgroup SPIFLASH_Private_Variables
  * \{
  */
-static char                    bSPIFlashName[HAL_SPIFLASH_TOTAL_NUMBER][4];
-static const bSPIFLASH_HalIf_t bSPIFLASH_HalIfTable[HAL_SPIFLASH_TOTAL_NUMBER] = HAL_SPIFLASH_IF;
-bSPIFLASH_Driver_t             bSPIFLASH_Driver[HAL_SPIFLASH_TOTAL_NUMBER];
 
-// sfud
-extern sfud_flash flash_table[];
+#ifndef HAL_SPIFLASH_TOTAL_NUMBER
+#define HAL_SPIFLASH_TOTAL_NUMBER 1
+#endif
 
+bDRIVER_HALIF_TABLE(bSPIFLASH_HalIf_t, DRIVER_NAME);
+static bSpiFlashPrivate_t bSpiFlashPrivate[bDRIVER_HALIF_NUM(bSPIFLASH_HalIf_t, DRIVER_NAME)];
 /**
  * \}
  */
@@ -100,12 +107,12 @@ extern sfud_flash flash_table[];
 
 static void _bSPIFlashSPI_Lock(const sfud_spi *spi)
 {
-    bHalITDriver.pIntDisable();
+    bHalIntDisable();
 }
 
 static void _bSPIFlashSPI_Unlock(const sfud_spi *spi)
 {
-    bHalITDriver.pIntEnable();
+    bHalIntEnable();
 }
 
 /**
@@ -114,52 +121,119 @@ static void _bSPIFlashSPI_Unlock(const sfud_spi *spi)
 static sfud_err _bSPIFlashSPI_WR(const sfud_spi *spi, const uint8_t *write_buf, size_t write_size,
                                  uint8_t *read_buf, size_t read_size)
 {
-    sfud_err           result = SFUD_SUCCESS;
-    bSPIFLASH_HalIf_t *_if    = (bSPIFLASH_HalIf_t *)spi->_hal_if;
-
+    sfud_err            result = SFUD_SUCCESS;
+    bDriverInterface_t *pdrv   = (bDriverInterface_t *)spi->user_data;
+    bHalQSPICmdInfo_t   info;
+    uint8_t            *ptr   = (uint8_t *)write_buf;
+    size_t              count = 0;
+    bDRIVER_GET_HALIF(_if, bSPIFLASH_HalIf_t, pdrv);
     if ((write_size && write_buf == NULL) || (read_size && read_buf == NULL))
     {
         return SFUD_ERR_WRITE;
     }
-
     if (_if->is_spi == 0)
     {
-        result = SFUD_ERR_WRITE;
-        // add qspi...
+        info.instruction = ptr[0];
+        info.imode       = B_HAL_QSPI_MODE_1LINE;
+        count++;
+        /* get address */
+        if (write_size > 1)
+        {
+            if (write_size >= 4)
+            {
+                /* address size is 3 Byte */
+                info.address = (ptr[1] << 16) | (ptr[2] << 8) | (ptr[3]);
+                info.adsize  = B_HAL_QSPI_SIZE_24BIT;
+                count += 3;
+            }
+            else
+            {
+                return SFUD_ERR_READ;
+            }
+            info.admode = B_HAL_QSPI_MODE_1LINE;
+        }
+        else
+        {
+            /* no address stage */
+            info.address = 0;
+            info.admode  = B_HAL_QSPI_MODE_NONE;
+            info.adsize  = 0;
+        }
+        info.alternate = 0;
+        info.abmode    = B_HAL_QSPI_MODE_NONE;
+        info.absize    = 0;
+        if (write_buf && read_buf)
+        {
+            /* recv data */
+            /* set dummy cycles */
+            if (count != write_size)
+            {
+                info.dummy = (write_size - count) * 8;
+            }
+            else
+            {
+                info.dummy = 0;
+            }
+
+            /* set recv size */
+            info.dmode = B_HAL_QSPI_MODE_1LINE;
+            info.dsize = read_size;
+            bHalQSPISendCmd(_if->_if._qspi, &info);
+
+            if (read_size != 0)
+            {
+                if (bHalQSPIReceiveData(_if->_if._qspi, read_buf) < 0)
+                {
+                    result = SFUD_ERR_READ;
+                }
+            }
+            return result;
+        }
+        else
+        {
+            /* send data */
+            /* set dummy cycles */
+            info.dummy = 0;
+
+            /* determine if there is data to send */
+            if (write_size - count > 0)
+            {
+                info.dmode = B_HAL_QSPI_MODE_1LINE;
+            }
+            else
+            {
+                info.dmode = B_HAL_QSPI_MODE_NONE;
+            }
+
+            /* set send buf and send size */
+            info.dsize = write_size - count;
+            bHalQSPISendCmd(_if->_if._qspi, &info);
+
+            if (write_size - count > 0)
+            {
+                if (bHalQSPITransmitData(_if->_if._qspi, (uint8_t *)(ptr + count)) < 0)
+                {
+                    result = SFUD_ERR_WRITE;
+                }
+            }
+            return result;
+        }
     }
     else
     {
-        bHalGPIODriver.pGpioWritePin(_if->_if._spi.cs.port, _if->_if._spi.cs.pin, 0);
+        bHalGpioWritePin(_if->_if._spi.cs.port, _if->_if._spi.cs.pin, 0);
         if (write_buf && write_size)
         {
-            bHalSPIDriver.pSend(&_if->_if._spi, (uint8_t *)write_buf, write_size);
+            bHalSpiSend(&_if->_if._spi, (uint8_t *)write_buf, write_size);
         }
         if (read_buf && read_size)
         {
-            bHalSPIDriver.pReceive(&_if->_if._spi, (uint8_t *)read_buf, read_size);
+            bHalSpiReceive(&_if->_if._spi, (uint8_t *)read_buf, read_size);
         }
-        bHalGPIODriver.pGpioWritePin(_if->_if._spi.cs.port, _if->_if._spi.cs.pin, 1);
+        bHalGpioWritePin(_if->_if._spi.cs.port, _if->_if._spi.cs.pin, 1);
     }
     return result;
 }
-
-#ifdef SFUD_USING_QSPI
-/**
- * read flash data by QSPI
- */
-static sfud_err _bSPIFlashQSPI_Read(const struct __sfud_spi *spi, uint32_t addr,
-                                    sfud_qspi_read_cmd_format *qspi_read_cmd_format,
-                                    uint8_t *read_buf, size_t read_size)
-{
-    sfud_err result = SFUD_SUCCESS;
-
-    /**
-     * add your qspi read flash data code
-     */
-
-    return result;
-}
-#endif /* SFUD_USING_QSPI */
 /**
  * \}
  */
@@ -171,76 +245,94 @@ static sfud_err _bSPIFlashQSPI_Read(const struct __sfud_spi *spi, uint32_t addr,
 
 sfud_err sfud_spi_port_init(sfud_flash *flash)
 {
-    sfud_err result = SFUD_SUCCESS;
-    flash->spi.wr   = _bSPIFlashSPI_WR;
-#if SFUD_USING_QSPI
-    flash->spi.qspi_read = _bSPIFlashQSPI_Read;  // Required when QSPI mode enable
-#endif
-    flash->spi.lock      = _bSPIFlashSPI_Lock;
-    flash->spi.unlock    = _bSPIFlashSPI_Unlock;
-    flash->spi.user_data = NULL;
-    flash->retry.delay   = NULL;
-    flash->retry.times   = 10000;  // Required
+    sfud_err result    = SFUD_SUCCESS;
+    flash->spi.wr      = _bSPIFlashSPI_WR;
+    flash->spi.lock    = _bSPIFlashSPI_Lock;
+    flash->spi.unlock  = _bSPIFlashSPI_Unlock;
+    flash->retry.delay = NULL;
+    flash->retry.times = 0xFFFFFFFF;  // Required
     return result;
 }
 
 /****************************************************driver interface******/
-static int _bSPIFLASH_Open(bSPIFLASH_Driver_t *pdrv)
+static int _bSPIFLASH_Open(bDriverInterface_t *pdrv)
 {
-    bDRV_GET_HALIF(_if, bSPIFLASH_HalIf_t, pdrv);
-    uint8_t cmd = 0xab;
+    bDRIVER_GET_HALIF(_if, bSPIFLASH_HalIf_t, pdrv);
+    uint8_t           cmd = 0xab;
+    bHalQSPICmdInfo_t info;
     if (_if->is_spi == 0)
     {
-        return -1;
-        // add qspi ...
+        info.abmode      = B_HAL_QSPI_MODE_NONE;
+        info.absize      = 0;
+        info.address     = 0;
+        info.admode      = B_HAL_QSPI_MODE_NONE;
+        info.adsize      = 0;
+        info.alternate   = 0;
+        info.dmode       = B_HAL_QSPI_MODE_NONE;
+        info.dsize       = 0;
+        info.dummy       = 0;
+        info.imode       = B_HAL_QSPI_MODE_1LINE;
+        info.instruction = cmd;
+        bHalQSPISendCmd(_if->_if._qspi, &info);
     }
     else
     {
-        bHalGPIODriver.pGpioWritePin(_if->_if._spi.cs.port, _if->_if._spi.cs.pin, 0);
-        bHalSPIDriver.pSend(&_if->_if._spi, &cmd, 1);
-        bHalGPIODriver.pGpioWritePin(_if->_if._spi.cs.port, _if->_if._spi.cs.pin, 1);
+        bHalGpioWritePin(_if->_if._spi.cs.port, _if->_if._spi.cs.pin, 0);
+        bHalSpiSend(&_if->_if._spi, &cmd, 1);
+        bHalGpioWritePin(_if->_if._spi.cs.port, _if->_if._spi.cs.pin, 1);
     }
     bHalDelayUs(10);
     return 0;
 }
 
-static int _bSPIFLASH_Close(bSPIFLASH_Driver_t *pdrv)
+static int _bSPIFLASH_Close(bDriverInterface_t *pdrv)
 {
-    bDRV_GET_HALIF(_if, bSPIFLASH_HalIf_t, pdrv);
-    uint8_t cmd = 0xb9;
+    bDRIVER_GET_HALIF(_if, bSPIFLASH_HalIf_t, pdrv);
+    uint8_t           cmd = 0xb9;
+    bHalQSPICmdInfo_t info;
     if (_if->is_spi == 0)
     {
-        return -1;
-        // add qspi ...
+        info.abmode      = B_HAL_QSPI_MODE_NONE;
+        info.absize      = 0;
+        info.address     = 0;
+        info.admode      = B_HAL_QSPI_MODE_NONE;
+        info.adsize      = 0;
+        info.alternate   = 0;
+        info.dmode       = B_HAL_QSPI_MODE_NONE;
+        info.dsize       = 0;
+        info.dummy       = 0;
+        info.imode       = B_HAL_QSPI_MODE_1LINE;
+        info.instruction = cmd;
+        bHalQSPISendCmd(_if->_if._qspi, &info);
     }
     else
     {
-        bHalGPIODriver.pGpioWritePin(_if->_if._spi.cs.port, _if->_if._spi.cs.pin, 0);
-        bHalSPIDriver.pSend(&_if->_if._spi, &cmd, 1);
-        bHalGPIODriver.pGpioWritePin(_if->_if._spi.cs.port, _if->_if._spi.cs.pin, 1);
+        bHalGpioWritePin(_if->_if._spi.cs.port, _if->_if._spi.cs.pin, 0);
+        bHalSpiSend(&_if->_if._spi, &cmd, 1);
+        bHalGpioWritePin(_if->_if._spi.cs.port, _if->_if._spi.cs.pin, 1);
     }
     bHalDelayUs(10);
     return 0;
 }
 
-static int _bSPIFLASH_ReadBuf(bSPIFLASH_Driver_t *pdrv, uint32_t addr, uint8_t *pbuf, uint16_t len)
+static int _bSPIFLASH_ReadBuf(bDriverInterface_t *pdrv, uint32_t addr, uint8_t *pbuf, uint32_t len)
 {
-    sfud_flash *flash = (sfud_flash *)(pdrv->_private._p);
+    sfud_flash *flash = &((bSpiFlashPrivate_t *)(pdrv->_private._p))->sflash;
     sfud_read(flash, addr, len, pbuf);
     return len;
 }
 
-static int _bSPIFLASH_WriteBuf(bSPIFLASH_Driver_t *pdrv, uint32_t addr, uint8_t *pbuf, uint16_t len)
+static int _bSPIFLASH_WriteBuf(bDriverInterface_t *pdrv, uint32_t addr, uint8_t *pbuf, uint32_t len)
 {
-    sfud_flash *flash = (sfud_flash *)(pdrv->_private._p);
+    sfud_flash *flash = &((bSpiFlashPrivate_t *)(pdrv->_private._p))->sflash;
     sfud_write(flash, addr, len, pbuf);
     return len;
 }
 
-static int _bSPIFLASH_Ctl(bSPIFLASH_Driver_t *pdrv, uint8_t cmd, void *param)
+static int _bSPIFLASH_Ctl(bDriverInterface_t *pdrv, uint8_t cmd, void *param)
 {
     int         retval = -1;
-    sfud_flash *flash  = (sfud_flash *)(pdrv->_private._p);
+    sfud_flash *flash  = &((bSpiFlashPrivate_t *)(pdrv->_private._p))->sflash;
     switch (cmd)
     {
         case bCMD_ERASE_SECTOR:
@@ -283,50 +375,42 @@ static int _bSPIFLASH_Ctl(bSPIFLASH_Driver_t *pdrv, uint8_t cmd, void *param)
  * \addtogroup SPIFLASH_Exported_Functions
  * \{
  */
-int bSPIFLASH_Init()
+int bSPIFLASH_Init(bDriverInterface_t *pdrv)
 {
-    size_t i = 0, number = sizeof(bSPIFLASH_HalIfTable) / sizeof(bSPIFLASH_HalIf_t);
-    int    retval = 0;
-    for (i = 0; i < number; i++)
-    {
-        sprintf(bSPIFlashName[i], "%03d", i);
-        flash_table[i].name        = bSPIFlashName[i];
-        flash_table[i].spi._hal_if = (void *)&bSPIFLASH_HalIfTable[i];
+    int                 retval = 0;
+    bSpiFlashPrivate_t *p_data;
+    bDRIVER_STRUCT_INIT(pdrv, DRIVER_NAME, bSPIFLASH_Init);
+    pdrv->open        = _bSPIFLASH_Open;
+    pdrv->close       = _bSPIFLASH_Close;
+    pdrv->ctl         = _bSPIFLASH_Ctl;
+    pdrv->read        = _bSPIFLASH_ReadBuf;
+    pdrv->write       = _bSPIFLASH_WriteBuf;
+    pdrv->_private._p = (void *)&bSpiFlashPrivate[pdrv->drv_no];
 
-        bSPIFLASH_Driver[i]._hal_if     = (void *)&bSPIFLASH_HalIfTable[i];
-        bSPIFLASH_Driver[i].open        = _bSPIFLASH_Open;
-        bSPIFLASH_Driver[i].close       = _bSPIFLASH_Close;
-        bSPIFLASH_Driver[i].ctl         = _bSPIFLASH_Ctl;
-        bSPIFLASH_Driver[i].read        = _bSPIFLASH_ReadBuf;
-        bSPIFLASH_Driver[i].write       = _bSPIFLASH_WriteBuf;
-        bSPIFLASH_Driver[i].status      = 0;
-        bSPIFLASH_Driver[i]._private._p = &flash_table[i];
-    }
+    p_data                       = (bSpiFlashPrivate_t *)(pdrv->_private._p);
+    p_data->sflash.index         = pdrv->drv_no;
+    p_data->sflash.name          = pdrv->pdes;
+    p_data->sflash.spi.user_data = (void *)pdrv;
 
-    for (i = 0; i < number; i++)
-    {
-        _bSPIFLASH_Open(&bSPIFLASH_Driver[i]);  // wakeup flash
-    }
+    _bSPIFLASH_Open(pdrv);
 
-    if (sfud_init() != SFUD_SUCCESS)
+    sfud_spi_port_init(&p_data->sflash);
+    if (sfud_device_init(&p_data->sflash) != SFUD_SUCCESS)
     {
-        for (i = 0; i < number; i++)
-        {
-            bSPIFLASH_Driver[i].status = -1;
-        }
         retval = -1;
     }
 
-    for (i = 0; i < number; i++)
-    {
-        _bSPIFLASH_Close(&bSPIFLASH_Driver[i]);  // powerdown flash
-    }
-
+    _bSPIFLASH_Close(pdrv);
     return retval;
 }
 
-bDRIVER_REG_INIT(bSPIFLASH_Init);
-
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section driver_init
+#endif
+bDRIVER_REG_INIT(B_DRIVER_SPIFLASH, bSPIFLASH_Init);
+#ifdef BSECTION_NEED_PRAGMA
+#pragma section
+#endif
 /**
  * \}
  */
